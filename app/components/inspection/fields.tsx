@@ -1,6 +1,6 @@
 'use client';
 
-import { Checkbox, createListCollection, Field, NumberInput, Portal, Select } from '@ark-ui/react';
+import { Checkbox, createListCollection, Field, NumberInput, Portal, RatingGroup, Select } from '@ark-ui/react';
 import { useMemo } from 'react';
 import { Controller, useFormContext, type FieldPath } from 'react-hook-form';
 
@@ -213,6 +213,92 @@ export function CheckboxField({ name, label }: { name: FieldName; label: string 
 						<Checkbox.Label className='text-sm text-foreground'>{label}</Checkbox.Label>
 						<Checkbox.HiddenInput onBlur={field.onBlur} />
 					</Checkbox.Root>
+					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
+				</Field.Root>
+			)}
+		/>
+	);
+}
+
+export function CheckboxGroupField({ name, label, options }: { name: FieldName; label: string; options: Option[] }) {
+	const { control } = useFormContext<FormValues>();
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => (
+				<div className='flex flex-col gap-2'>
+					<span className={labelClass}>{label}</span>
+					<Checkbox.Group
+						value={(field.value as unknown as string[]) ?? []}
+						onValueChange={field.onChange}
+						onBlur={field.onBlur}
+						invalid={!!fieldState.error}
+						className='flex flex-col gap-2'
+					>
+						{options.map((option) => (
+							<Checkbox.Root
+								key={option.value}
+								value={option.value}
+								className='flex items-center gap-2'
+							>
+								<Checkbox.Control className='flex h-5 w-5 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger'>
+									<Checkbox.Indicator>✓</Checkbox.Indicator>
+								</Checkbox.Control>
+								<Checkbox.Label className='text-sm text-foreground'>{option.label}</Checkbox.Label>
+								<Checkbox.HiddenInput />
+							</Checkbox.Root>
+						))}
+					</Checkbox.Group>
+					{fieldState.error && <span className={errorClass}>{fieldState.error.message}</span>}
+				</div>
+			)}
+		/>
+	);
+}
+
+export function RatingField({ name, label, count = 5 }: { name: FieldName; label: string; count?: number }) {
+	const { control } = useFormContext<FormValues>();
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => (
+				<Field.Root
+					invalid={!!fieldState.error}
+					className='flex flex-col gap-1.5'
+				>
+					<Field.Label className={labelClass}>{label}</Field.Label>
+					<RatingGroup.Root
+						count={count}
+						value={(field.value as number) ?? 0}
+						onValueChange={(details) => field.onChange(details.value)}
+						className='flex items-center gap-3'
+					>
+						<RatingGroup.Control className='flex gap-1'>
+							<RatingGroup.Context>
+								{(api) =>
+									api.items.map((index) => (
+										<RatingGroup.Item
+											key={index}
+											index={index}
+											className='cursor-pointer text-4xl leading-none text-subtle data-highlighted:text-accent'
+										>
+											<RatingGroup.ItemContext>
+												{(item) => (item.highlighted ? '●' : '○')}
+											</RatingGroup.ItemContext>
+										</RatingGroup.Item>
+									))
+								}
+							</RatingGroup.Context>
+						</RatingGroup.Control>
+						<RatingGroup.Label className='font-mono text-sm text-muted'>
+							{(field.value as number) ?? 0} / {count}
+						</RatingGroup.Label>
+						<RatingGroup.HiddenInput onBlur={field.onBlur} />
+					</RatingGroup.Root>
 					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
 				</Field.Root>
 			)}

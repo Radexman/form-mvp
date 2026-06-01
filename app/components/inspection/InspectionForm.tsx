@@ -6,9 +6,10 @@ import { useRef } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
 import { defaultValues, fullSchema, STEP_META, stepFields, type FormValues } from './schema';
-import { StepQueen } from './steps/StepQueen';
+import { StepBrood } from './steps/brood/StepBrood';
+import { StepQueen } from './steps/queen/StepQueen';
 
-const STEP_COMPONENTS = [StepQueen];
+const STEP_COMPONENTS = [StepQueen, StepBrood];
 
 export function InspectionForm() {
 	const methods = useForm<FormValues>({

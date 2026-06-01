@@ -3,8 +3,8 @@
 import { useEffect } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 
-import { CheckboxField, NumberField, SelectField } from '../fields';
-import type { FormValues } from '../schema';
+import { CheckboxField, NumberField, SelectField } from '../../fields';
+import type { FormValues } from '../../schema';
 
 const STATUS_OPTIONS = [
 	{ value: 'seen', label: 'Widziana' },
@@ -31,9 +31,17 @@ export function StepQueen() {
 	const { control, setValue } = useFormContext<FormValues>();
 	const queenMarked = useWatch({ control, name: 'queen_marked' });
 	const queenCells = useWatch({ control, name: 'queen_cells' });
+	const queenStatus = useWatch({ control, name: 'queen_status' });
 
-	const showColor = queenMarked === true;
+	const showMarking = queenStatus !== 'missing';
+	const showColor = showMarking && queenMarked === true;
 	const showCellsCount = !!queenCells && queenCells !== 'none';
+
+	useEffect(() => {
+		if (!showMarking) {
+			setValue('queen_marked', false, { shouldValidate: true });
+		}
+	}, [showMarking, setValue]);
 
 	useEffect(() => {
 		if (!showColor) {
@@ -42,9 +50,7 @@ export function StepQueen() {
 	}, [showColor, setValue]);
 
 	useEffect(() => {
-		if (!showCellsCount) {
-			setValue('queen_cells_count', 0, { shouldValidate: true });
-		}
+		setValue('queen_cells_count', showCellsCount ? 1 : 0, { shouldValidate: true });
 	}, [showCellsCount, setValue]);
 
 	return (
@@ -54,10 +60,12 @@ export function StepQueen() {
 				label='Status'
 				options={STATUS_OPTIONS}
 			/>
-			<CheckboxField
-				name='queen_marked'
-				label='Znakowana'
-			/>
+			{showMarking && (
+				<CheckboxField
+					name='queen_marked'
+					label='Znakowana'
+				/>
+			)}
 			{showColor && (
 				<SelectField
 					name='queen_marker_color'
@@ -74,7 +82,7 @@ export function StepQueen() {
 				<NumberField
 					name='queen_cells_count'
 					label='Liczba mateczników'
-					min={0}
+					min={1}
 				/>
 			)}
 		</div>
