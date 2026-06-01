@@ -1,0 +1,221 @@
+'use client';
+
+import { Checkbox, createListCollection, Field, NumberInput, Portal, Select } from '@ark-ui/react';
+import { useMemo } from 'react';
+import { Controller, useFormContext, type FieldPath } from 'react-hook-form';
+
+import type { FormValues } from './schema';
+
+type FieldName = FieldPath<FormValues>;
+type Option = { value: string; label: string };
+
+const labelClass = 'text-sm text-muted';
+const errorClass = 'text-xs text-danger';
+const controlClass =
+	'w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-foreground outline-none transition-colors focus:border-accent data-invalid:border-danger';
+
+function useError(name: FieldName): string | undefined {
+	const {
+		formState: { errors },
+	} = useFormContext<FormValues>();
+	return (errors as Record<string, { message?: string } | undefined>)[name]?.message;
+}
+
+export function TextField({ name, label, placeholder }: { name: FieldName; label: string; placeholder?: string }) {
+	const { register } = useFormContext<FormValues>();
+	const error = useError(name);
+
+	return (
+		<Field.Root
+			invalid={!!error}
+			className='flex flex-col gap-1.5'
+		>
+			<Field.Label className={labelClass}>{label}</Field.Label>
+			<Field.Input
+				className={controlClass}
+				placeholder={placeholder}
+				{...register(name)}
+			/>
+			<Field.ErrorText className={errorClass}>{error}</Field.ErrorText>
+		</Field.Root>
+	);
+}
+
+export function TextareaField({
+	name,
+	label,
+	placeholder,
+	rows = 4,
+}: {
+	name: FieldName;
+	label: string;
+	placeholder?: string;
+	rows?: number;
+}) {
+	const { register } = useFormContext<FormValues>();
+	const error = useError(name);
+
+	return (
+		<Field.Root
+			invalid={!!error}
+			className='flex flex-col gap-1.5'
+		>
+			<Field.Label className={labelClass}>{label}</Field.Label>
+			<Field.Textarea
+				rows={rows}
+				className={`${controlClass} resize-y`}
+				placeholder={placeholder}
+				{...register(name)}
+			/>
+			<Field.ErrorText className={errorClass}>{error}</Field.ErrorText>
+		</Field.Root>
+	);
+}
+
+export function NumberField({
+	name,
+	label,
+	placeholder,
+	min,
+}: {
+	name: FieldName;
+	label: string;
+	placeholder?: string;
+	min?: number;
+}) {
+	const { control } = useFormContext<FormValues>();
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => (
+				<Field.Root
+					invalid={!!fieldState.error}
+					className='flex flex-col gap-1.5'
+				>
+					<Field.Label className={labelClass}>{label}</Field.Label>
+					<NumberInput.Root
+						min={min}
+						invalid={!!fieldState.error}
+						value={field.value === undefined || Number.isNaN(field.value) ? '' : String(field.value)}
+						onValueChange={(details) => field.onChange(details.valueAsNumber)}
+					>
+						<NumberInput.Control className='flex items-stretch overflow-hidden rounded-md border border-border bg-surface-2 focus-within:border-accent data-invalid:border-danger'>
+							<NumberInput.Input
+								className='w-full bg-transparent px-3 py-2 text-foreground outline-none'
+								placeholder={placeholder}
+								onBlur={field.onBlur}
+								ref={field.ref}
+							/>
+							<div className='flex flex-col border-l border-border'>
+								<NumberInput.IncrementTrigger className='flex flex-1 items-center justify-center px-2 text-muted hover:bg-surface-3'>
+									+
+								</NumberInput.IncrementTrigger>
+								<NumberInput.DecrementTrigger className='flex flex-1 items-center justify-center border-t border-border px-2 text-muted hover:bg-surface-3'>
+									−
+								</NumberInput.DecrementTrigger>
+							</div>
+						</NumberInput.Control>
+					</NumberInput.Root>
+					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
+				</Field.Root>
+			)}
+		/>
+	);
+}
+
+export function SelectField({
+	name,
+	label,
+	options,
+	placeholder = 'Wybierz...',
+}: {
+	name: FieldName;
+	label: string;
+	options: Option[];
+	placeholder?: string;
+}) {
+	const { control } = useFormContext<FormValues>();
+	const collection = useMemo(() => createListCollection({ items: options }), [options]);
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => (
+				<Field.Root
+					invalid={!!fieldState.error}
+					className='flex flex-col gap-1.5'
+				>
+					<Field.Label className={labelClass}>{label}</Field.Label>
+					<Select.Root
+						collection={collection}
+						invalid={!!fieldState.error}
+						value={field.value ? [field.value as string] : []}
+						onValueChange={(details) => field.onChange(details.value[0] ?? '')}
+						positioning={{ sameWidth: true }}
+					>
+						<Select.Control>
+							<Select.Trigger
+								onBlur={field.onBlur}
+								className={`${controlClass} flex items-center justify-between gap-2`}
+							>
+								<Select.ValueText placeholder={placeholder} />
+								<Select.Indicator className='text-subtle'>▾</Select.Indicator>
+							</Select.Trigger>
+						</Select.Control>
+						<Portal>
+							<Select.Positioner>
+								<Select.Content className='z-50 overflow-hidden rounded-md border border-border bg-surface-2 shadow-lg'>
+									{options.map((option) => (
+										<Select.Item
+											key={option.value}
+											item={option}
+											className='flex cursor-pointer items-center justify-between px-3 py-2 text-foreground data-highlighted:bg-surface-3 data-[state=checked]:text-accent'
+										>
+											<Select.ItemText>{option.label}</Select.ItemText>
+											<Select.ItemIndicator>✓</Select.ItemIndicator>
+										</Select.Item>
+									))}
+								</Select.Content>
+							</Select.Positioner>
+						</Portal>
+					</Select.Root>
+					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
+				</Field.Root>
+			)}
+		/>
+	);
+}
+
+export function CheckboxField({ name, label }: { name: FieldName; label: string }) {
+	const { control } = useFormContext<FormValues>();
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => (
+				<Field.Root
+					invalid={!!fieldState.error}
+					className='flex flex-col gap-1.5'
+				>
+					<Checkbox.Root
+						checked={!!field.value}
+						onCheckedChange={(details) => field.onChange(details.checked === true)}
+						invalid={!!fieldState.error}
+						className='flex items-center gap-2'
+					>
+						<Checkbox.Control className='flex h-5 w-5 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger'>
+							<Checkbox.Indicator>✓</Checkbox.Indicator>
+						</Checkbox.Control>
+						<Checkbox.Label className='text-sm text-foreground'>{label}</Checkbox.Label>
+						<Checkbox.HiddenInput onBlur={field.onBlur} />
+					</Checkbox.Root>
+					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
+				</Field.Root>
+			)}
+		/>
+	);
+}
