@@ -77,11 +77,13 @@ export function NumberField({
 	label,
 	placeholder,
 	min,
+	max,
 }: {
 	name: FieldName;
 	label: string;
 	placeholder?: string;
 	min?: number;
+	max?: number;
 }) {
 	const { control } = useFormContext<FormValues>();
 
@@ -97,6 +99,7 @@ export function NumberField({
 					<Field.Label className={labelClass}>{label}</Field.Label>
 					<NumberInput.Root
 						min={min}
+						max={max}
 						invalid={!!fieldState.error}
 						value={field.value === undefined || Number.isNaN(field.value) ? '' : String(field.value)}
 						onValueChange={(details) => field.onChange(details.valueAsNumber)}

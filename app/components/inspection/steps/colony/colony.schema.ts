@@ -17,14 +17,8 @@ export const colonyObject = z.object({
 	honey_kg: z.number('Podaj liczbę').min(0, 'Nie może być ujemne').max(200, 'Maksymalnie 200'),
 });
 
-// TODO Add this after pdf service schema update
-// export const colonySchema = colonyObject.refine(
-// 	(data) => !(data.honey_stores === 'none' && data.honey_kg > 0),
-// 	{
-// 		error: 'Przy braku zapasów miodu ilość nie może być większa niż 0',
-// 		path: ['honey_kg'],
-// 	},
-// );
+// TODO Add honey stores none refine after pdf service schema update
+export const colonySchema = colonyObject;
 
 export type ColonyValues = z.infer<typeof colonyObject>;
 
@@ -35,3 +29,5 @@ export const colonyDefaults: DefaultValues<ColonyValues> = {
 	hive_space: undefined,
 	honey_kg: 0,
 };
+
+export const colonyStep = { key: 'colony', title: 'Rodzina' } as const;

@@ -83,6 +83,7 @@ export function StepQueen() {
 					name='queen_cells_count'
 					label='Liczba mateczników'
 					min={1}
+					max={50}
 				/>
 			)}
 		</div>
