@@ -6,8 +6,8 @@ export const BROOD_TYPE = ['eggs', 'open', 'capped', 'drone'] as const;
 export const broodObject = z.object({
 	brood_types: z.array(z.enum(BROOD_TYPE)),
 	brood_pattern: z
-		.number({ message: 'Wybierz zwartość czerwiu' })
-		.int('Liczba całkowita')
+		.number('Wybierz zwartość czerwiu')
+		.int('Podaj liczbę całkowitą')
 		.min(1, 'Wybierz zwartość czerwiu')
 		.max(5, 'Maksymalnie 5'),
 });
