@@ -2,9 +2,10 @@
 
 import { Steps, useSteps } from '@ark-ui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
+import { buildInspectionPayload } from './payload';
 import { defaultValues, fullSchema, STEP_META, stepFields, type FormValues } from './schema';
 import { StepBrood } from './steps/brood/StepBrood';
 import { StepQueen } from './steps/queen/StepQueen';
@@ -13,6 +14,14 @@ import { StepComb } from './steps/comb/StepComb';
 import { StepActions } from './steps/actions/StepActions';
 import { StepNotes } from './steps/notes/StepNotes';
 import { StepHealth } from './steps/health/StepHealth';
+
+// Same-origin proxy route (see app/api/generate-pdf/route.ts) — avoids CORS.
+const PDF_ENDPOINT = '/api/generate-pdf';
+
+function filenameFromDisposition(header: string | null): string | undefined {
+	const match = header?.match(/filename="?([^"]+)"?/);
+	return match?.[1];
+}
 
 const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions, StepNotes, StepHealth];
 
@@ -24,6 +33,7 @@ export function InspectionForm() {
 	});
 
 	const validatedSteps = useRef<Set<number>>(new Set());
+	const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'error'>('idle');
 
 	const steps = useSteps({
 		count: STEP_META.length,
@@ -40,15 +50,36 @@ export function InspectionForm() {
 		steps.goToNextStep();
 	};
 
-	const onSubmit = methods.handleSubmit((data) => {
-		// TODO: replace with the real submit (server action / API call).
-		console.log('Inspection submitted:', data);
+	const generatePdf = methods.handleSubmit(async (data) => {
+		setSubmitState('submitting');
+		try {
+			const response = await fetch(PDF_ENDPOINT, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(buildInspectionPayload(data)),
+			});
+			if (!response.ok) throw new Error(`Serwer odpowiedział ${response.status}`);
+
+			const blob = await response.blob();
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = filenameFromDisposition(response.headers.get('content-disposition')) ?? 'przeglad.pdf';
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			URL.revokeObjectURL(url);
+			setSubmitState('idle');
+		} catch (error) {
+			console.error('PDF generation failed:', error);
+			setSubmitState('error');
+		}
 	});
 
 	return (
 		<FormProvider {...methods}>
 			<form
-				onSubmit={onSubmit}
+				onSubmit={(event) => event.preventDefault()}
 				className='mx-auto flex w-full max-w-6xl flex-col gap-8'
 			>
 				<Steps.RootProvider
@@ -90,16 +121,23 @@ export function InspectionForm() {
 						<Steps.CompletedContent className='rounded-lg border border-accent-dim bg-surface p-6 text-foreground'>
 							Wszystkie kroki zostały ukończone.
 						</Steps.CompletedContent>
+						{submitState === 'error' && (
+							<p className='text-sm text-danger'>
+								Nie udało się wygenerować PDF. Sprawdź połączenie i spróbuj ponownie.
+							</p>
+						)}
 						<div className='flex justify-between gap-3'>
 							<Steps.PrevTrigger className='rounded-md border border-border bg-surface px-4 py-2 text-sm text-muted transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40'>
 								Wstecz
 							</Steps.PrevTrigger>
 							{isLastStep ? (
 								<button
-									type='submit'
-									className='rounded-md bg-accent px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-accent-dim hover:text-foreground'
+									type='button'
+									onClick={generatePdf}
+									disabled={submitState === 'submitting'}
+									className='rounded-md bg-accent px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-accent-dim hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40'
 								>
-									Zapisz
+									{submitState === 'submitting' ? 'Generowanie…' : 'Zapisz i pobierz PDF'}
 								</button>
 							) : (
 								<button
