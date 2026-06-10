@@ -12,8 +12,9 @@ import { StepColony } from './steps/colony/StepColony';
 import { StepComb } from './steps/comb/StepComb';
 import { StepActions } from './steps/actions/StepActions';
 import { StepNotes } from './steps/notes/StepNotes';
+import { StepHealth } from './steps/health/StepHealth';
 
-const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions, StepNotes];
+const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions, StepNotes, StepHealth];
 
 export function InspectionForm() {
 	const methods = useForm<FormValues>({
