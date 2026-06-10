@@ -11,8 +11,9 @@ import { StepQueen } from './steps/queen/StepQueen';
 import { StepColony } from './steps/colony/StepColony';
 import { StepComb } from './steps/comb/StepComb';
 import { StepActions } from './steps/actions/StepActions';
+import { StepNotes } from './steps/notes/StepNotes';
 
-const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions];
+const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions, StepNotes];
 
 export function InspectionForm() {
 	const methods = useForm<FormValues>({
@@ -81,9 +82,7 @@ export function InspectionForm() {
 								index={index}
 								className='rounded-lg border border-border bg-surface p-6'
 							>
-								<h2 className='mb-4 text-lg font-semibold text-foreground'>
-									{STEP_META[index].title}
-								</h2>
+								<h2 className='mb-4 text-lg font-semibold text-foreground'>{STEP_META[index].title}</h2>
 								<StepComponent />
 							</Steps.Content>
 						))}

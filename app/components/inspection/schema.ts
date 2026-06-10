@@ -6,6 +6,7 @@ import { queenDefaults, queenObject, queenSchema, queenStep } from './steps/quee
 import { colonyDefaults, colonyObject, colonySchema, colonyStep } from './steps/colony/colony.schema';
 import { combDefaults, combObject, combSchema, combStep } from './steps/comb/comb.schema';
 import { actionsDefaults, actionsObject, actionsSchema, actionsStep } from './steps/actions/actions.schema';
+import { notesDefaults, notesObject, notesSchema, notesStep } from './steps/notes/notes.schema';
 
 const STEPS = [
 	{ ...queenStep, object: queenObject, defaults: queenDefaults },
@@ -13,11 +14,17 @@ const STEPS = [
 	{ ...colonyStep, object: colonyObject, defaults: colonyDefaults },
 	{ ...combStep, object: combObject, defaults: combDefaults },
 	{ ...actionsStep, object: actionsObject, defaults: actionsDefaults },
+	{ ...notesStep, object: notesObject, defaults: notesDefaults },
 ] as const;
 
 export const STEP_META = STEPS.map(({ key, title }) => ({ key, title }));
 
-export const fullSchema = queenSchema.and(broodSchema).and(colonySchema).and(combSchema).and(actionsSchema);
+export const fullSchema = queenSchema
+	.and(broodSchema)
+	.and(colonySchema)
+	.and(combSchema)
+	.and(actionsSchema)
+	.and(notesSchema);
 
 export type FormValues = z.infer<typeof fullSchema>;
 
