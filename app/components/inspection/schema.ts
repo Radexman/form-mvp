@@ -4,16 +4,18 @@ import type { DefaultValues, FieldPath } from 'react-hook-form';
 import { broodDefaults, broodObject, broodSchema, broodStep } from './steps/brood/brood.schema';
 import { queenDefaults, queenObject, queenSchema, queenStep } from './steps/queen/queen.schema';
 import { colonyDefaults, colonyObject, colonySchema, colonyStep } from './steps/colony/colony.schema';
+import { combDefaults, combObject, combSchema, combStep } from './steps/comb/comb.schema';
 
 const STEPS = [
 	{ ...queenStep, object: queenObject, defaults: queenDefaults },
 	{ ...broodStep, object: broodObject, defaults: broodDefaults },
 	{ ...colonyStep, object: colonyObject, defaults: colonyDefaults },
+	{ ...combStep, object: combObject, defaults: combDefaults },
 ] as const;
 
 export const STEP_META = STEPS.map(({ key, title }) => ({ key, title }));
 
-export const fullSchema = queenSchema.and(broodSchema).and(colonySchema);
+export const fullSchema = queenSchema.and(broodSchema).and(colonySchema).and(combSchema);
 
 export type FormValues = z.infer<typeof fullSchema>;
 

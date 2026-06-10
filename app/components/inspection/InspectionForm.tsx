@@ -9,8 +9,9 @@ import { defaultValues, fullSchema, STEP_META, stepFields, type FormValues } fro
 import { StepBrood } from './steps/brood/StepBrood';
 import { StepQueen } from './steps/queen/StepQueen';
 import { StepColony } from './steps/colony/StepColony';
+import { StepComb } from './steps/comb/StepComb';
 
-const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony];
+const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb];
 
 export function InspectionForm() {
 	const methods = useForm<FormValues>({

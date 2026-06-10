@@ -1,5 +1,3 @@
-'use client';
-
 import { CheckboxGroupField, RatingField } from '../../fields';
 
 const TYPE_OPTIONS = [

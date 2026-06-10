@@ -1,5 +1,3 @@
-'use client';
-
 import { NumberField, SelectField } from '../../fields';
 
 const BEHAVIOR_OPTIONS = [
