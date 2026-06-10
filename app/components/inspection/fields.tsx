@@ -192,6 +192,101 @@ export function SelectField({
 	);
 }
 
+type GroupedOption = { value: string; label: string; group: string };
+
+export function MultiSelectField({
+	name,
+	label,
+	options,
+	placeholder = 'Wybierz...',
+}: {
+	name: FieldName;
+	label: string;
+	options: GroupedOption[];
+	placeholder?: string;
+}) {
+	const { control } = useFormContext<FormValues>();
+	const collection = useMemo(
+		() => createListCollection({ items: options, groupBy: (item) => item.group }),
+		[options],
+	);
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => {
+				const selected = (field.value as string[] | undefined) ?? [];
+				const selectedOptions = options.filter((option) => selected.includes(option.value));
+
+				return (
+					<Field.Root
+						invalid={!!fieldState.error}
+						className='flex flex-col gap-1.5'
+					>
+						<Field.Label className={labelClass}>{label}</Field.Label>
+						<Select.Root
+							multiple
+							collection={collection}
+							invalid={!!fieldState.error}
+							value={selected}
+							onValueChange={(details) => field.onChange(details.value)}
+							positioning={{ sameWidth: true }}
+						>
+							<Select.Control>
+								<Select.Trigger
+									onBlur={field.onBlur}
+									className={`${controlClass} flex items-center justify-between gap-2 text-left`}
+								>
+									{selectedOptions.length ? (
+										<span className='flex flex-wrap gap-1.5'>
+											{selectedOptions.map((option) => (
+												<span
+													key={option.value}
+													className='rounded bg-surface-3 px-2 py-0.5 text-xs text-foreground'
+												>
+													{option.label}
+												</span>
+											))}
+										</span>
+									) : (
+										<span className='text-subtle'>{placeholder}</span>
+									)}
+									<Select.Indicator className='shrink-0 text-subtle'>▾</Select.Indicator>
+								</Select.Trigger>
+							</Select.Control>
+							<Portal>
+								<Select.Positioner>
+									<Select.Content className='z-50 max-h-72 overflow-y-auto rounded-md border border-border bg-surface-2 shadow-lg'>
+										{collection.group().map(([group, items]) => (
+											<Select.ItemGroup key={group}>
+												<Select.ItemGroupLabel className='px-3 pb-1 pt-2 text-xs uppercase tracking-wide text-subtle'>
+													{group}
+												</Select.ItemGroupLabel>
+												{items.map((option) => (
+													<Select.Item
+														key={option.value}
+														item={option}
+														className='flex cursor-pointer items-center justify-between px-3 py-2 text-foreground data-highlighted:bg-surface-3 data-[state=checked]:text-accent'
+													>
+														<Select.ItemText>{option.label}</Select.ItemText>
+														<Select.ItemIndicator>✓</Select.ItemIndicator>
+													</Select.Item>
+												))}
+											</Select.ItemGroup>
+										))}
+									</Select.Content>
+								</Select.Positioner>
+							</Portal>
+						</Select.Root>
+						<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
+					</Field.Root>
+				);
+			}}
+		/>
+	);
+}
+
 export function CheckboxField({ name, label }: { name: FieldName; label: string }) {
 	const { control } = useFormContext<FormValues>();
 
