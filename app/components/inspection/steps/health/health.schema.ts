@@ -13,6 +13,7 @@ export const HEALTH_CONDITION = [
 ] as const;
 
 export const healthObject = z.object({
+	condition_observed: z.boolean(),
 	conditions: z.array(z.enum(HEALTH_CONDITION)),
 	varroa_drop_count: z
 		.number('Podaj liczbę')
@@ -44,6 +45,7 @@ export const healthSchema = healthObject
 export type HealthValues = z.infer<typeof healthObject>;
 
 export const healthDefaults: DefaultValues<HealthValues> = {
+	condition_observed: false,
 	conditions: [],
 	varroa_drop_count: null,
 	health_other: '',

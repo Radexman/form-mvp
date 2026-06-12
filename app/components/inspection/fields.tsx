@@ -112,10 +112,10 @@ export function NumberField({
 								ref={field.ref}
 							/>
 							<div className='flex flex-col border-l border-border'>
-								<NumberInput.IncrementTrigger className='flex flex-1 items-center justify-center px-2 text-muted hover:bg-surface-3'>
+								<NumberInput.IncrementTrigger className='flex flex-1 items-center justify-center px-4 text-2xl text-muted hover:bg-surface-3 sm:px-2 sm:text-base'>
 									+
 								</NumberInput.IncrementTrigger>
-								<NumberInput.DecrementTrigger className='flex flex-1 items-center justify-center border-t border-border px-2 text-muted hover:bg-surface-3'>
+								<NumberInput.DecrementTrigger className='flex flex-1 items-center justify-center border-t border-border px-4 text-2xl text-muted hover:bg-surface-3 sm:px-2 sm:text-base'>
 									−
 								</NumberInput.DecrementTrigger>
 							</div>
@@ -305,7 +305,7 @@ export function CheckboxField({ name, label }: { name: FieldName; label: string 
 						invalid={!!fieldState.error}
 						className='flex items-center gap-2'
 					>
-						<Checkbox.Control className='flex h-5 w-5 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger'>
+						<Checkbox.Control className='flex h-7 w-7 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger sm:h-5 sm:w-5'>
 							<Checkbox.Indicator>✓</Checkbox.Indicator>
 						</Checkbox.Control>
 						<Checkbox.Label className='text-sm text-foreground'>{label}</Checkbox.Label>
@@ -341,7 +341,7 @@ export function CheckboxGroupField({ name, label, options }: { name: FieldName; 
 								value={option.value}
 								className='flex items-center gap-2'
 							>
-								<Checkbox.Control className='flex h-5 w-5 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger'>
+								<Checkbox.Control className='flex h-7 w-7 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger sm:h-5 sm:w-5'>
 									<Checkbox.Indicator>✓</Checkbox.Indicator>
 								</Checkbox.Control>
 								<Checkbox.Label className='text-sm text-foreground'>{option.label}</Checkbox.Label>
@@ -382,7 +382,7 @@ export function RatingField({ name, label, count = 5 }: { name: FieldName; label
 										<RatingGroup.Item
 											key={index}
 											index={index}
-											className='cursor-pointer text-4xl leading-none text-subtle data-highlighted:text-accent'
+											className='cursor-pointer text-5xl leading-none text-subtle data-highlighted:text-accent sm:text-4xl'
 										>
 											<RatingGroup.ItemContext>
 												{(item) => (item.highlighted ? '●' : '○')}
