@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRef, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
+import { getInspectionContext } from '../../lib/inspection-context';
 import { buildInspectionPayload } from './payload';
 import { defaultValues, fullSchema, STEP_META, stepFields, type FormValues } from './schema';
 import { StepBrood } from './steps/brood/StepBrood';
@@ -15,7 +16,6 @@ import { StepActions } from './steps/actions/StepActions';
 import { StepNotes } from './steps/notes/StepNotes';
 import { StepHealth } from './steps/health/StepHealth';
 
-// Same-origin proxy route (see app/api/generate-pdf/route.ts) — avoids CORS.
 const PDF_ENDPOINT = '/api/generate-pdf';
 
 function filenameFromDisposition(header: string | null): string | undefined {
@@ -53,10 +53,11 @@ export function InspectionForm() {
 	const generatePdf = methods.handleSubmit(async (data) => {
 		setSubmitState('submitting');
 		try {
+			const context = await getInspectionContext();
 			const response = await fetch(PDF_ENDPOINT, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(buildInspectionPayload(data)),
+				body: JSON.stringify(buildInspectionPayload(data, context)),
 			});
 			if (!response.ok) throw new Error(`Serwer odpowiedział ${response.status}`);
 

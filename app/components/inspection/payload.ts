@@ -1,30 +1,15 @@
 import type { FormValues } from './schema';
-
-// The form does not yet collect apiary/hive identification or weather. Until apiary
-// selection and the Open-Meteo lookup are wired up, the header is stubbed and weather
-// is sent as null (the backend and PDF template both accept a missing weather block).
-// TODO: replace with the selected apiary/hive and a real weather fetch.
-const PLACEHOLDER_META = {
-	apiary_name: 'Pasieka testowa',
-	beekeeper_name: 'Jan Kowalski',
-	veterinary_number: 'PL00000000',
-	hive_number: '1',
-	inspection_number: '1',
-};
+import type { InspectionContext } from '../../lib/inspection-context';
 
 function emptyToNull(value: string): string | null {
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : null;
 }
 
-/** Reshapes the flat form state into the nested payload expected by /generate-pdf. */
-export function buildInspectionPayload(data: FormValues) {
+export function buildInspectionPayload(data: FormValues, context: InspectionContext) {
 	return {
-		meta: {
-			...PLACEHOLDER_META,
-			inspection_date: new Date().toISOString().slice(0, 10),
-		},
-		weather: null,
+		meta: context.meta,
+		weather: context.weather,
 		queen: {
 			queen_status: data.queen_status,
 			queen_marked: data.queen_marked,
@@ -57,7 +42,6 @@ export function buildInspectionPayload(data: FormValues) {
 		health: {
 			conditions: data.conditions,
 			varroa_drop_count: data.varroa_drop_count,
-			// `health_other` is the flat-form alias for `health.other` (avoids colliding with actions.other).
 			other: emptyToNull(data.health_other),
 		},
 		notes: emptyToNull(data.notes),
