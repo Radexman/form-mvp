@@ -69,13 +69,18 @@ async function getWeather(lat: number, lon: number): Promise<InspectionWeather |
 	}
 }
 
-export async function getInspectionContext(): Promise<InspectionContext> {
+export interface InspectionMetaOverrides {
+	hive_number?: string | number;
+	inspection_number?: string | number;
+}
+
+export async function getInspectionContext(overrides: InspectionMetaOverrides = {}): Promise<InspectionContext> {
 	const meta: InspectionMeta = {
 		apiary_name: apiaryProfile.apiary_name,
 		beekeeper_name: apiaryProfile.beekeeper_name,
 		veterinary_number: apiaryProfile.veterinary_number,
-		hive_number: String(apiaryProfile.hive_number),
-		inspection_number: String(apiaryProfile.inspection_number),
+		hive_number: String(overrides.hive_number ?? apiaryProfile.hive_number),
+		inspection_number: String(overrides.inspection_number ?? apiaryProfile.inspection_number),
 		inspection_date: new Date().toISOString().slice(0, 10),
 	};
 

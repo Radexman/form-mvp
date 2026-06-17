@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
 import { getInspectionContext } from '../../lib/inspection-context';
+import type { Beehive } from '../../lib/beehives';
 import { buildInspectionPayload } from './payload';
 import { defaultValues, fullSchema, STEP_META, stepFields, type FormValues } from './schema';
 import { StepBrood } from './steps/brood/StepBrood';
@@ -25,7 +26,7 @@ function filenameFromDisposition(header: string | null): string | undefined {
 
 const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions, StepNotes, StepHealth];
 
-export function InspectionForm() {
+export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => void }) {
 	const methods = useForm<FormValues>({
 		resolver: zodResolver(fullSchema),
 		defaultValues,
@@ -34,6 +35,7 @@ export function InspectionForm() {
 
 	const validatedSteps = useRef<Set<number>>(new Set());
 	const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'error'>('idle');
+	const [inspectionNumber, setInspectionNumber] = useState(String(hive.nextInspectionNumber));
 
 	const steps = useSteps({
 		count: STEP_META.length,
@@ -53,7 +55,10 @@ export function InspectionForm() {
 	const generatePdf = methods.handleSubmit(async (data) => {
 		setSubmitState('submitting');
 		try {
-			const context = await getInspectionContext();
+			const context = await getInspectionContext({
+				hive_number: hive.number,
+				inspection_number: inspectionNumber,
+			});
 			const response = await fetch(PDF_ENDPOINT, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -83,6 +88,31 @@ export function InspectionForm() {
 				onSubmit={(event) => event.preventDefault()}
 				className='mx-auto flex w-full max-w-6xl flex-col gap-8'
 			>
+				<div className='flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between'>
+					<div className='flex items-center gap-3'>
+						<button
+							type='button'
+							onClick={onBack}
+							className='rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-2'
+						>
+							← Ule
+						</button>
+						<span className='text-sm text-foreground'>
+							Ul nr <span className='font-semibold'>{hive.number}</span>
+						</span>
+					</div>
+					<label className='flex items-center gap-2 text-sm text-muted'>
+						Nr przeglądu
+						<input
+							type='number'
+							min={1}
+							inputMode='numeric'
+							value={inspectionNumber}
+							onChange={(event) => setInspectionNumber(event.target.value)}
+							className='w-20 rounded-md border border-border bg-surface-2 px-3 py-2 text-foreground outline-none transition-colors focus:border-accent'
+						/>
+					</label>
+				</div>
 				<Steps.RootProvider
 					value={steps}
 					className='flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-10'
