@@ -3,6 +3,12 @@ import type { DefaultValues } from 'react-hook-form';
 
 export const COMB_CONDITION = ['good', 'old', 'needs_replacement'] as const;
 
+export const COMB_CONDITION_OPTIONS = [
+	{ value: 'good', label: 'Dobry' },
+	{ value: 'old', label: 'Stare plastry' },
+	{ value: 'needs_replacement', label: 'Potrzeba wymiany' },
+];
+
 export const combObject = z.object({
 	frames_brood: z.number('Podaj liczbę').int('Podaj liczbę całkowitą').min(0, 'Nie może być ujemne'),
 	frames_honey: z.number('Podaj liczbę').int('Podaj liczbę całkowitą').min(0, 'Nie może być ujemne'),

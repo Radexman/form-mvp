@@ -1,11 +1,5 @@
 import { CheckboxGroupField, RatingField } from '../../fields';
-
-const TYPE_OPTIONS = [
-	{ value: 'eggs', label: 'Jaja' },
-	{ value: 'open', label: 'Otwarty (larwy)' },
-	{ value: 'capped', label: 'Kryty' },
-	{ value: 'drone', label: 'Trutowy' },
-];
+import { BROOD_TYPE_OPTIONS } from './brood.schema';
 
 export function StepBrood() {
 	return (
@@ -13,7 +7,7 @@ export function StepBrood() {
 			<CheckboxGroupField
 				name='brood_types'
 				label='Rodzaj'
-				options={TYPE_OPTIONS}
+				options={BROOD_TYPE_OPTIONS}
 			/>
 			<RatingField
 				name='brood_pattern'

@@ -74,6 +74,11 @@ export interface InspectionMetaOverrides {
 	inspection_number?: string | number;
 }
 
+export async function fetchCurrentWeather(): Promise<InspectionWeather | null> {
+	const { lat, lon } = apiaryProfile.location;
+	return getWeather(lat, lon);
+}
+
 export async function getInspectionContext(overrides: InspectionMetaOverrides = {}): Promise<InspectionContext> {
 	const meta: InspectionMeta = {
 		apiary_name: apiaryProfile.apiary_name,

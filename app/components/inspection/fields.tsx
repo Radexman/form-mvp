@@ -1,6 +1,15 @@
 'use client';
 
-import { Checkbox, createListCollection, Field, NumberInput, Portal, RatingGroup, Select } from '@ark-ui/react';
+import {
+	Checkbox,
+	createListCollection,
+	Field,
+	NumberInput,
+	Portal,
+	RadioGroup,
+	RatingGroup,
+	Select,
+} from '@ark-ui/react';
 import { useMemo } from 'react';
 import { Controller, useFormContext, type FieldPath } from 'react-hook-form';
 
@@ -287,6 +296,105 @@ export function MultiSelectField({
 	);
 }
 
+export function RadioField({
+	name,
+	label,
+	options,
+	columns = 2,
+}: {
+	name: FieldName;
+	label: string;
+	options: Option[];
+	columns?: 1 | 2;
+}) {
+	const { control } = useFormContext<FormValues>();
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => (
+				<Field.Root
+					invalid={!!fieldState.error}
+					className='flex flex-col gap-2'
+				>
+					<Field.Label className={labelClass}>{label}</Field.Label>
+					<RadioGroup.Root
+						value={(field.value as string | undefined) ?? null}
+						onValueChange={(details) => field.onChange(details.value)}
+						onBlur={field.onBlur}
+						invalid={!!fieldState.error}
+						className={`grid gap-2 ${columns === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}
+					>
+						{options.map((option) => (
+							<RadioGroup.Item
+								key={option.value}
+								value={option.value}
+								className='flex min-h-14 cursor-pointer items-center rounded-lg border border-border bg-surface-2 px-4 py-3 text-foreground transition-colors hover:border-subtle data-[state=checked]:border-accent data-[state=checked]:bg-accent/10 data-[state=checked]:ring-1 data-[state=checked]:ring-accent data-invalid:data-[state=checked]:border-danger'
+							>
+								<RadioGroup.ItemText className='text-sm font-medium'>{option.label}</RadioGroup.ItemText>
+								<RadioGroup.ItemHiddenInput />
+							</RadioGroup.Item>
+						))}
+					</RadioGroup.Root>
+					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
+				</Field.Root>
+			)}
+		/>
+	);
+}
+
+const SWATCH_COLORS: Record<string, string> = {
+	white: '#ffffff',
+	yellow: '#fde047',
+	red: '#fca5a5',
+	green: '#6ee7b7',
+	blue: '#67e8f9',
+};
+
+export function SwatchField({ name, label, options }: { name: FieldName; label: string; options: Option[] }) {
+	const { control } = useFormContext<FormValues>();
+
+	return (
+		<Controller
+			control={control}
+			name={name}
+			render={({ field, fieldState }) => (
+				<Field.Root
+					invalid={!!fieldState.error}
+					className='flex flex-col gap-2'
+				>
+					<Field.Label className={labelClass}>{label}</Field.Label>
+					<RadioGroup.Root
+						value={(field.value as string | undefined) ?? null}
+						onValueChange={(details) => field.onChange(details.value)}
+						onBlur={field.onBlur}
+						invalid={!!fieldState.error}
+						className='flex flex-wrap gap-3'
+					>
+						{options.map((option) => (
+							<RadioGroup.Item
+								key={option.value}
+								value={option.value}
+								title={option.label}
+								aria-label={option.label}
+								className='group flex h-12 w-12 cursor-pointer items-center justify-center rounded-full ring-2 ring-border ring-offset-2 ring-offset-surface transition-all hover:ring-subtle data-[state=checked]:ring-accent'
+								style={{ backgroundColor: SWATCH_COLORS[option.value] ?? 'transparent' }}
+							>
+								<span className='hidden text-base font-bold text-background group-data-[state=checked]:block'>
+									✓
+								</span>
+								<RadioGroup.ItemHiddenInput />
+							</RadioGroup.Item>
+						))}
+					</RadioGroup.Root>
+					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
+				</Field.Root>
+			)}
+		/>
+	);
+}
+
 export function CheckboxField({ name, label }: { name: FieldName; label: string }) {
 	const { control } = useFormContext<FormValues>();
 
@@ -303,12 +411,12 @@ export function CheckboxField({ name, label }: { name: FieldName; label: string 
 						checked={!!field.value}
 						onCheckedChange={(details) => field.onChange(details.checked === true)}
 						invalid={!!fieldState.error}
-						className='flex items-center gap-2'
+						className='flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface-2 px-4 py-3 transition-colors hover:border-subtle data-[state=checked]:border-accent data-[state=checked]:bg-accent/10 data-invalid:border-danger'
 					>
-						<Checkbox.Control className='flex h-7 w-7 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger sm:h-5 sm:w-5'>
+						<Checkbox.Control className='flex h-7 w-7 shrink-0 items-center justify-center rounded border border-border bg-surface text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent'>
 							<Checkbox.Indicator>✓</Checkbox.Indicator>
 						</Checkbox.Control>
-						<Checkbox.Label className='text-sm text-foreground'>{label}</Checkbox.Label>
+						<Checkbox.Label className='text-sm font-medium text-foreground'>{label}</Checkbox.Label>
 						<Checkbox.HiddenInput onBlur={field.onBlur} />
 					</Checkbox.Root>
 					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>
@@ -339,12 +447,12 @@ export function CheckboxGroupField({ name, label, options }: { name: FieldName; 
 							<Checkbox.Root
 								key={option.value}
 								value={option.value}
-								className='flex items-center gap-2'
+								className='flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface-2 px-4 py-3 transition-colors hover:border-subtle data-[state=checked]:border-accent data-[state=checked]:bg-accent/10 data-invalid:border-danger'
 							>
-								<Checkbox.Control className='flex h-7 w-7 items-center justify-center rounded border border-border bg-surface-2 text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent data-invalid:border-danger sm:h-5 sm:w-5'>
+								<Checkbox.Control className='flex h-7 w-7 shrink-0 items-center justify-center rounded border border-border bg-surface text-background data-[state=checked]:border-accent data-[state=checked]:bg-accent'>
 									<Checkbox.Indicator>✓</Checkbox.Indicator>
 								</Checkbox.Control>
-								<Checkbox.Label className='text-sm text-foreground'>{option.label}</Checkbox.Label>
+								<Checkbox.Label className='text-sm font-medium text-foreground'>{option.label}</Checkbox.Label>
 								<Checkbox.HiddenInput />
 							</Checkbox.Root>
 						))}
@@ -375,26 +483,35 @@ export function RatingField({ name, label, count = 5 }: { name: FieldName; label
 						onValueChange={(details) => field.onChange(details.value)}
 						className='flex items-center gap-3'
 					>
-						<RatingGroup.Control className='flex gap-1'>
+						<RatingGroup.Control className='flex gap-2'>
 							<RatingGroup.Context>
 								{(api) =>
-									api.items.map((index) => (
+									api.items.map((value) => (
 										<RatingGroup.Item
-											key={index}
-											index={index}
-											className='cursor-pointer text-5xl leading-none text-subtle data-highlighted:text-accent sm:text-4xl'
+											key={value}
+											index={value}
+											className='cursor-pointer'
 										>
 											<RatingGroup.ItemContext>
-												{(item) => (item.highlighted ? '●' : '○')}
+												{(item) => (
+													<span
+														className={`flex h-12 w-12 items-center justify-center rounded-full border font-mono text-base transition-colors ${
+															item.checked
+																? 'border-accent bg-accent/10 text-foreground ring-1 ring-accent'
+																: item.highlighted
+																	? 'border-accent/60 bg-accent/5 text-foreground'
+																	: 'border-border bg-surface-2 text-muted'
+														}`}
+													>
+														{value}
+													</span>
+												)}
 											</RatingGroup.ItemContext>
 										</RatingGroup.Item>
 									))
 								}
 							</RatingGroup.Context>
 						</RatingGroup.Control>
-						<RatingGroup.Label className='font-mono text-sm text-muted'>
-							{(field.value as number) ?? 0} / {count}
-						</RatingGroup.Label>
 						<RatingGroup.HiddenInput onBlur={field.onBlur} />
 					</RatingGroup.Root>
 					<Field.ErrorText className={errorClass}>{fieldState.error?.message}</Field.ErrorText>

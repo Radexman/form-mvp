@@ -5,6 +5,27 @@ export const QUEEN_STATUS = ['seen', 'not_seen_brood_ok', 'missing'] as const;
 export const QUEEN_MARKER_COLOR = ['white', 'yellow', 'red', 'green', 'blue'] as const;
 export const QUEEN_CELLS = ['none', 'emergency', 'swarm', 'supersedure'] as const;
 
+export const QUEEN_STATUS_OPTIONS = [
+	{ value: 'seen', label: 'Widziana' },
+	{ value: 'not_seen_brood_ok', label: 'Niewidziana, czerw OK' },
+	{ value: 'missing', label: 'Brak matki' },
+];
+
+export const QUEEN_MARKER_COLOR_OPTIONS = [
+	{ value: 'white', label: 'Biały' },
+	{ value: 'yellow', label: 'Żółty' },
+	{ value: 'red', label: 'Czerwony' },
+	{ value: 'green', label: 'Zielony' },
+	{ value: 'blue', label: 'Niebieski' },
+];
+
+export const QUEEN_CELLS_OPTIONS = [
+	{ value: 'none', label: 'Brak' },
+	{ value: 'emergency', label: 'Ratunkowe' },
+	{ value: 'swarm', label: 'Rojowe' },
+	{ value: 'supersedure', label: 'Cicha wymiana' },
+];
+
 export const queenObject = z.object({
 	queen_status: z.enum(QUEEN_STATUS, 'Wybierz status matki'),
 	queen_marked: z.boolean(),

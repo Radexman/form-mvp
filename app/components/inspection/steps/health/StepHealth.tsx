@@ -5,17 +5,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 
 import { CheckboxGroupField, NumberField, TextareaField, CheckboxField } from '../../fields';
 import type { FormValues } from '../../schema';
-
-const CONDITION_OPTIONS = [
-	{ value: 'dwv', label: 'DWV (wirus zdeformowanych skrzydeł)' },
-	{ value: 'foulbrood', label: 'Zgnilec' },
-	{ value: 'dysentery', label: 'Biegunka' },
-	{ value: 'varroa', label: 'Warroza' },
-	{ value: 'chalkbrood', label: 'Grzybica wapienna' },
-	{ value: 'acarine', label: 'Roztoczowica (świerzbowiec)' },
-	{ value: 'wax_moth', label: 'Barciak (mól woskowy)' },
-	{ value: 'other', label: 'Inne' },
-];
+import { HEALTH_CONDITION_OPTIONS } from './health.schema';
 
 export function StepHealth() {
 	const { control, setValue } = useFormContext<FormValues>();
@@ -51,7 +41,7 @@ export function StepHealth() {
 					<CheckboxGroupField
 						name='conditions'
 						label='Objawy / sygnały alarmowe'
-						options={CONDITION_OPTIONS}
+						options={HEALTH_CONDITION_OPTIONS}
 					/>
 					{showVarroaCount && (
 						<NumberField

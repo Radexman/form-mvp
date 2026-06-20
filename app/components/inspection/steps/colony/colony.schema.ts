@@ -5,6 +5,26 @@ export const COLONY_BEHAVIOR = ['calm', 'nervous', 'aggressive', 'swarm_mood'] a
 export const COLONY_HONEY_STORES = ['sufficient', 'low', 'none'] as const;
 export const COLONY_HIVE_SPACE = ['ok', 'tight', 'loose', 'added_super'] as const;
 
+export const COLONY_BEHAVIOR_OPTIONS = [
+	{ value: 'calm', label: 'Spokojne' },
+	{ value: 'nervous', label: 'Nerwowe' },
+	{ value: 'aggressive', label: 'Agresywne' },
+	{ value: 'swarm_mood', label: 'Nastrój rojowy' },
+];
+
+export const COLONY_HONEY_STORES_OPTIONS = [
+	{ value: 'sufficient', label: 'Wystarczające' },
+	{ value: 'low', label: 'Małe' },
+	{ value: 'none', label: 'Brak' },
+];
+
+export const COLONY_HIVE_SPACE_OPTIONS = [
+	{ value: 'ok', label: 'Wystarczająca' },
+	{ value: 'tight', label: 'Ciasno' },
+	{ value: 'loose', label: 'Luźno' },
+	{ value: 'added_super', label: 'Nadstawka' },
+];
+
 export const colonyObject = z.object({
 	frames_covered: z
 		.number('Podaj liczbę')

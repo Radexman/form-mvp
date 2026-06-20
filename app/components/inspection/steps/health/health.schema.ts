@@ -12,6 +12,17 @@ export const HEALTH_CONDITION = [
 	'other',
 ] as const;
 
+export const HEALTH_CONDITION_OPTIONS = [
+	{ value: 'dwv', label: 'DWV (wirus zdeformowanych skrzydeł)' },
+	{ value: 'foulbrood', label: 'Zgnilec' },
+	{ value: 'dysentery', label: 'Biegunka' },
+	{ value: 'varroa', label: 'Warroza' },
+	{ value: 'chalkbrood', label: 'Grzybica wapienna' },
+	{ value: 'acarine', label: 'Roztoczowica (świerzbowiec)' },
+	{ value: 'wax_moth', label: 'Barciak (mól woskowy)' },
+	{ value: 'other', label: 'Inne' },
+];
+
 export const healthObject = z.object({
 	condition_observed: z.boolean(),
 	conditions: z.array(z.enum(HEALTH_CONDITION)),

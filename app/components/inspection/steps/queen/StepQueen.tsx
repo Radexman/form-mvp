@@ -3,29 +3,9 @@
 import { useEffect } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 
-import { CheckboxField, NumberField, SelectField } from '../../fields';
+import { CheckboxField, NumberField, RadioField, SwatchField } from '../../fields';
 import type { FormValues } from '../../schema';
-
-const STATUS_OPTIONS = [
-	{ value: 'seen', label: 'Widziana' },
-	{ value: 'not_seen_brood_ok', label: 'Niewidziana, czerw OK' },
-	{ value: 'missing', label: 'Brak matki' },
-];
-
-const COLOR_OPTIONS = [
-	{ value: 'white', label: 'Biały' },
-	{ value: 'yellow', label: 'Żółty' },
-	{ value: 'red', label: 'Czerwony' },
-	{ value: 'green', label: 'Zielony' },
-	{ value: 'blue', label: 'Niebieski' },
-];
-
-const CELLS_OPTIONS = [
-	{ value: 'none', label: 'Brak' },
-	{ value: 'emergency', label: 'Ratunkowe' },
-	{ value: 'swarm', label: 'Rojowe' },
-	{ value: 'supersedure', label: 'Cicha wymiana' },
-];
+import { QUEEN_CELLS_OPTIONS, QUEEN_MARKER_COLOR_OPTIONS, QUEEN_STATUS_OPTIONS } from './queen.schema';
 
 export function StepQueen() {
 	const { control, setValue } = useFormContext<FormValues>();
@@ -55,10 +35,10 @@ export function StepQueen() {
 
 	return (
 		<div className='grid gap-4'>
-			<SelectField
+			<RadioField
 				name='queen_status'
 				label='Status'
-				options={STATUS_OPTIONS}
+				options={QUEEN_STATUS_OPTIONS}
 			/>
 			{showMarking && (
 				<CheckboxField
@@ -67,16 +47,16 @@ export function StepQueen() {
 				/>
 			)}
 			{showColor && (
-				<SelectField
+				<SwatchField
 					name='queen_marker_color'
 					label='Kolor znakowania'
-					options={COLOR_OPTIONS}
+					options={QUEEN_MARKER_COLOR_OPTIONS}
 				/>
 			)}
-			<SelectField
+			<RadioField
 				name='queen_cells'
 				label='Mateczniki'
-				options={CELLS_OPTIONS}
+				options={QUEEN_CELLS_OPTIONS}
 			/>
 			{showCellsCount && (
 				<NumberField

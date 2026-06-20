@@ -1,10 +1,5 @@
-import { NumberField, SelectField } from '../../fields';
-
-const COMB_CONDITION_OPTIONS = [
-	{ value: 'good', label: 'Dobry' },
-	{ value: 'old', label: 'Stare plastry' },
-	{ value: 'needs_replacement', label: 'Potrzeba wymiany' },
-];
+import { NumberField, RadioField } from '../../fields';
+import { COMB_CONDITION_OPTIONS } from './comb.schema';
 
 export function StepComb() {
 	return (
@@ -29,7 +24,7 @@ export function StepComb() {
 				label='Puste'
 				min={0}
 			/>
-			<SelectField
+			<RadioField
 				name='comb_condition'
 				label='Stan plastrów'
 				options={COMB_CONDITION_OPTIONS}

@@ -2,12 +2,13 @@
 
 import { Steps, useSteps } from '@ark-ui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
-import { getInspectionContext } from '../../lib/inspection-context';
+import { fetchCurrentWeather, type InspectionWeather } from '../../lib/inspection-context';
 import type { Beehive } from '../../lib/beehives';
 import { buildInspectionPayload } from './payload';
+import { buildMeta } from './summary.helpers';
 import { defaultValues, fullSchema, STEP_META, stepFields, type FormValues } from './schema';
 import { StepBrood } from './steps/brood/StepBrood';
 import { StepQueen } from './steps/queen/StepQueen';
@@ -16,6 +17,7 @@ import { StepComb } from './steps/comb/StepComb';
 import { StepActions } from './steps/actions/StepActions';
 import { StepNotes } from './steps/notes/StepNotes';
 import { StepHealth } from './steps/health/StepHealth';
+import { StepSummary, type WeatherState } from './steps/summary/StepSummary';
 
 const PDF_ENDPOINT = '/api/generate-pdf';
 
@@ -25,6 +27,11 @@ function filenameFromDisposition(header: string | null): string | undefined {
 }
 
 const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions, StepNotes, StepHealth];
+
+const SUMMARY_META = { key: 'summary', title: 'Podsumowanie' };
+const ALL_STEPS = [...STEP_META, SUMMARY_META];
+const SUMMARY_INDEX = STEP_META.length;
+const TOTAL_STEPS = STEP_META.length + 1;
 
 export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => void }) {
 	const methods = useForm<FormValues>({
@@ -36,29 +43,50 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	const validatedSteps = useRef<Set<number>>(new Set());
 	const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'error'>('idle');
 	const [inspectionNumber, setInspectionNumber] = useState(String(hive.nextInspectionNumber));
+	const [weather, setWeather] = useState<InspectionWeather | null>(null);
+	const [weatherState, setWeatherState] = useState<WeatherState>('idle');
 
 	const steps = useSteps({
-		count: STEP_META.length,
-		isStepValid: (index) => validatedSteps.current.has(index),
+		count: TOTAL_STEPS,
+		isStepValid: (index) =>
+			index === SUMMARY_INDEX ? validatedSteps.current.size >= STEP_META.length : validatedSteps.current.has(index),
 	});
 
 	const currentStep = steps.value;
-	const isLastStep = currentStep === STEP_META.length - 1;
+	const isLastStep = currentStep === SUMMARY_INDEX;
+
+	const loadWeather = useCallback(async () => {
+		setWeatherState('loading');
+		try {
+			const result = await fetchCurrentWeather();
+			setWeather(result);
+			setWeatherState(result ? 'ready' : 'error');
+		} catch (error) {
+			console.warn('Weather fetch failed:', error);
+			setWeather(null);
+			setWeatherState('error');
+		}
+	}, []);
 
 	const handleNext = async () => {
 		const ok = await methods.trigger(stepFields[currentStep]);
 		if (!ok) return;
 		validatedSteps.current.add(currentStep);
+		if (currentStep + 1 === SUMMARY_INDEX && weatherState === 'idle') {
+			loadWeather();
+		}
 		steps.goToNextStep();
+	};
+
+	const handleEdit = (stepKey: string) => {
+		const index = STEP_META.findIndex((meta) => meta.key === stepKey);
+		if (index >= 0) steps.setStep(index);
 	};
 
 	const generatePdf = methods.handleSubmit(async (data) => {
 		setSubmitState('submitting');
 		try {
-			const context = await getInspectionContext({
-				hive_number: hive.number,
-				inspection_number: inspectionNumber,
-			});
+			const context = { meta: buildMeta(hive.number, inspectionNumber), weather };
 			const response = await fetch(PDF_ENDPOINT, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -118,7 +146,7 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 					className='flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-10'
 				>
 					<Steps.List className='flex flex-row gap-1 overflow-x-auto pb-2 sm:w-56 sm:shrink-0 sm:flex-col sm:gap-0 sm:overflow-visible sm:pb-0'>
-						{STEP_META.map((meta, index) => (
+						{ALL_STEPS.map((meta, index) => (
 							<Steps.Item
 								key={meta.key}
 								index={index}
@@ -132,7 +160,7 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 										{meta.title}
 									</span>
 								</Steps.Trigger>
-								{index < STEP_META.length - 1 && (
+								{index < ALL_STEPS.length - 1 && (
 									<Steps.Separator className='mx-3 h-px w-6 flex-none bg-border transition-colors data-complete:bg-accent-dim sm:mx-0 sm:my-1 sm:ml-4.25 sm:h-5 sm:w-px' />
 								)}
 							</Steps.Item>
@@ -149,6 +177,21 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 								<StepComponent />
 							</Steps.Content>
 						))}
+						<Steps.Content
+							key={SUMMARY_META.key}
+							index={SUMMARY_INDEX}
+							className='rounded-lg border border-border bg-surface p-6'
+						>
+							<h2 className='mb-4 text-lg font-semibold text-foreground'>{SUMMARY_META.title}</h2>
+							<StepSummary
+								hiveNumber={hive.number}
+								inspectionNumber={inspectionNumber}
+								weather={weather}
+								weatherState={weatherState}
+								onRefreshWeather={loadWeather}
+								onEdit={handleEdit}
+							/>
+						</Steps.Content>
 						<Steps.CompletedContent className='rounded-lg border border-accent-dim bg-surface p-6 text-foreground'>
 							Wszystkie kroki zostały ukończone.
 						</Steps.CompletedContent>
