@@ -22,7 +22,8 @@ export const ASK_HONEY = 'Miód?';
 export const ASK_POLLEN = 'Pierzga?';
 
 export const NOT_UNDERSTOOD = 'Nie zrozumiałem. Powiedz na przykład: miód osiem, pierzga jeden.';
-export const NOT_HEARD = 'Nie słyszę. Powtórz proszę.';
+/** Re-asked after a long silence — the question again, not a complaint. */
+export const CONFIRM_AGAIN = 'Dalej?';
 export const REPAIR_INTRO = 'Zapytam po kolei.';
 export const FINISHED = 'Gotowe. Wszystkie ramki zapisane.';
 export const STOPPED = 'Przerwane.';

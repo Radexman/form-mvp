@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
-import { runFieldScript, type FieldScriptApi } from './fieldScript';
+import { runFieldScript, type FieldScriptApi, type StepOutcome } from './fieldScript';
 import { parseControl } from './grammar';
-import { useDialogueRuntime } from './useDialogueRuntime';
-import { SELF_DRIVEN_STEPS, VOICE_SCRIPTS } from './voiceSteps';
+import { useDialogueRuntime, type DialogueRuntime } from './useDialogueRuntime';
+import { VOICE_SCRIPTS } from './voiceSteps';
 
 /**
  * Walks the form's steps by voice.
@@ -29,15 +29,21 @@ export interface InspectionDialogueOptions {
 	/** Move the form to a step; the walk keeps the screen in sync as it goes. */
 	goToStep: (index: number) => void;
 	api: FieldScriptApi;
+	/**
+	 * Steps with a hand-written dialogue, by key. They take the same runtime and
+	 * report the same outcome as a declarative script, so the walk treats them
+	 * identically.
+	 */
+	runners?: Record<string, (runtime: DialogueRuntime) => Promise<StepOutcome>>;
 }
 
-export function useInspectionDialogue({ steps, startIndex, goToStep, api }: InspectionDialogueOptions) {
+export function useInspectionDialogue({ steps, startIndex, goToStep, api, runners }: InspectionDialogueOptions) {
 	const runtime = useDialogueRuntime();
 
 	// The walk outlives any single render, so reach the outside through refs.
-	const depsRef = useRef({ steps, startIndex, goToStep, api });
+	const depsRef = useRef({ steps, startIndex, goToStep, api, runners });
 	useEffect(() => {
-		depsRef.current = { steps, startIndex, goToStep, api };
+		depsRef.current = { steps, startIndex, goToStep, api, runners };
 	});
 
 	const start = useCallback(
@@ -54,17 +60,15 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api }: Insp
 				for (;;) {
 					runtime.guard();
 					const step = list[index];
+					const custom = depsRef.current.runners?.[step.key];
 					const script = VOICE_SCRIPTS[step.key];
 
-					if (!script) {
-						await runtime.announce(
-							SELF_DRIVEN_STEPS[step.key] ??
-								`Sekcja ${step.title} nie jest jeszcze obsługiwana głosem. Wypełnij ją ręcznie.`,
-						);
+					if (!custom && !script) {
+						await runtime.announce(`Sekcja ${step.title} nie jest jeszcze obsługiwana głosem. Wypełnij ją ręcznie.`);
 						return;
 					}
 
-					const outcome = await runFieldScript(runtime, script, scriptApi);
+					const outcome = custom ? await custom(runtime) : await runFieldScript(runtime, script!, scriptApi);
 
 					if (outcome === 'back') {
 						if (index === 0) {

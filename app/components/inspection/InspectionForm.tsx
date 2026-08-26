@@ -7,6 +7,9 @@ import { FormProvider, useForm, type FieldPath } from 'react-hook-form';
 
 import { fetchCurrentWeather, type InspectionWeather } from '../../lib/inspection-context';
 import { useInspectionDialogue } from '../../lib/voice/useInspectionDialogue';
+import { runCombStep } from '../../lib/voice/runCombStep';
+import { CombViewContext } from './comb-view';
+import { renumberFrames, type FrameValues } from './steps/comb/comb.schema';
 import type { FieldValues } from '../../lib/voice/fieldScript';
 import { VoicePanel } from './VoicePanel';
 import type { Beehive } from '../../lib/beehives';
@@ -61,6 +64,8 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	const [inspectionNumber, setInspectionNumber] = useState(String(hive.nextInspectionNumber));
 	const [weather, setWeather] = useState<InspectionWeather | null>(null);
 	const [weatherState, setWeatherState] = useState<WeatherState>('idle');
+	// Comb's visible frame lives here so the spoken dialogue can move it.
+	const [activeFrame, setActiveFrame] = useState(0);
 
 	const steps = useSteps({
 		count: TOTAL_STEPS,
@@ -80,6 +85,17 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 		api: {
 			getValues: () => methods.getValues() as FieldValues,
 			setValue: (name, value) => methods.setValue(name as FieldPath<FormValues>, value as never, { shouldDirty: true }),
+		},
+		// Comb does not fit the field engine — it loops over frames rather than a
+		// fixed list of fields — so it is supplied as a runner on the same runtime.
+		runners: {
+			comb: (runtime) =>
+				runCombStep(runtime, {
+					getFrames: () => (methods.getValues('frames') ?? []) as FrameValues[],
+					setFrames: (frames) => methods.setValue('frames', renumberFrames(frames), { shouldDirty: true }),
+					setSlots: (slots) => methods.setValue('slots', slots, { shouldDirty: true }),
+					setActive: setActiveFrame,
+				}),
 		},
 	});
 
@@ -139,137 +155,139 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	});
 
 	return (
-		<FormProvider {...methods}>
-			<form
-				onSubmit={(event) => event.preventDefault()}
-				className='mx-auto flex w-full max-w-6xl flex-col gap-8'
-			>
-				<div className='flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between'>
-					<div className='flex items-center gap-3'>
-						<button
-							type='button'
-							onClick={onBack}
-							className='rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-2'
-						>
-							← Ule
-						</button>
-						<span className='text-sm text-foreground'>
-							Ul nr <span className='font-semibold'>{hive.number}</span>
-						</span>
-					</div>
-					<label className='flex items-center gap-2 text-sm text-muted'>
-						Nr przeglądu
-						<input
-							type='number'
-							min={1}
-							inputMode='numeric'
-							value={inspectionNumber}
-							onChange={(event) => setInspectionNumber(event.target.value)}
-							className='w-20 rounded-md border border-border bg-surface-2 px-3 py-2 text-foreground outline-none transition-colors focus:border-accent'
-						/>
-					</label>
-				</div>
-				<Steps.RootProvider
-					value={steps}
-					className='flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-10'
+		<CombViewContext.Provider value={{ active: activeFrame, setActive: setActiveFrame }}>
+			<FormProvider {...methods}>
+				<form
+					onSubmit={(event) => event.preventDefault()}
+					className='mx-auto flex w-full max-w-6xl flex-col gap-8'
 				>
-					<Steps.List className='flex flex-row gap-1 overflow-x-auto pb-2 sm:w-56 sm:shrink-0 sm:flex-col sm:gap-0 sm:overflow-visible sm:pb-0'>
-						{ALL_STEPS.map((meta, index) => (
-							<Steps.Item
-								key={meta.key}
-								index={index}
-								className='flex items-center sm:flex-col sm:items-stretch'
+					<div className='flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between'>
+						<div className='flex items-center gap-3'>
+							<button
+								type='button'
+								onClick={onBack}
+								className='rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-2'
 							>
-								<Steps.Trigger className='group flex items-center gap-3 text-left sm:py-1.5'>
-									<Steps.Indicator className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-mono text-sm text-muted transition-colors data-current:border-accent data-current:bg-accent data-current:text-background data-complete:border-accent-dim data-complete:bg-accent-dim data-complete:text-foreground'>
-										{index + 1}
-									</Steps.Indicator>
-									<span className='hidden text-sm text-subtle transition-colors group-data-current:text-foreground group-data-complete:text-muted sm:inline'>
-										{meta.title}
-									</span>
-								</Steps.Trigger>
-								{index < ALL_STEPS.length - 1 && (
-									<Steps.Separator className='mx-3 h-px w-6 flex-none bg-border transition-colors data-complete:bg-accent-dim sm:mx-0 sm:my-1 sm:ml-4.25 sm:h-5 sm:w-px' />
-								)}
-							</Steps.Item>
-						))}
-					</Steps.List>
-					<div className='flex min-w-0 flex-1 flex-col gap-8'>
-						{!isLastStep && (
-							<VoicePanel
-								title='Sterowanie głosem'
-								hint='Odpowiadaj na pytania, potwierdzaj słowem „dalej”. Po sekcji zapytam, czy przejść do kolejnej.'
-								supported={dialogue.supported}
-								running={dialogue.running}
-								log={dialogue.log}
-								error={dialogue.error}
-								onStart={() => void dialogue.start()}
-								onStop={dialogue.stop}
-								unsupportedNote='Sterowanie głosem wymaga przeglądarki Chrome (Android). Wypełnij formularz ręcznie.'
+								← Ule
+							</button>
+							<span className='text-sm text-foreground'>
+								Ul nr <span className='font-semibold'>{hive.number}</span>
+							</span>
+						</div>
+						<label className='flex items-center gap-2 text-sm text-muted'>
+							Nr przeglądu
+							<input
+								type='number'
+								min={1}
+								inputMode='numeric'
+								value={inspectionNumber}
+								onChange={(event) => setInspectionNumber(event.target.value)}
+								className='w-20 rounded-md border border-border bg-surface-2 px-3 py-2 text-foreground outline-none transition-colors focus:border-accent'
 							/>
-						)}
-						{STEP_META.map((meta, index) => {
-							const StepComponent = STEP_COMPONENTS[meta.key];
-							return (
-								<Steps.Content
+						</label>
+					</div>
+					<Steps.RootProvider
+						value={steps}
+						className='flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-10'
+					>
+						<Steps.List className='flex flex-row gap-1 overflow-x-auto pb-2 sm:w-56 sm:shrink-0 sm:flex-col sm:gap-0 sm:overflow-visible sm:pb-0'>
+							{ALL_STEPS.map((meta, index) => (
+								<Steps.Item
 									key={meta.key}
 									index={index}
-									className='rounded-lg border border-border bg-surface p-6'
+									className='flex items-center sm:flex-col sm:items-stretch'
 								>
-									<h2 className='mb-4 text-lg font-semibold text-foreground'>{meta.title}</h2>
-									<StepComponent />
-								</Steps.Content>
-							);
-						})}
-						<Steps.Content
-							key={SUMMARY_META.key}
-							index={SUMMARY_INDEX}
-							className='rounded-lg border border-border bg-surface p-6'
-						>
-							<h2 className='mb-4 text-lg font-semibold text-foreground'>{SUMMARY_META.title}</h2>
-							<StepSummary
-								hiveNumber={hive.number}
-								inspectionNumber={inspectionNumber}
-								weather={weather}
-								weatherState={weatherState}
-								onRefreshWeather={loadWeather}
-								onEdit={handleEdit}
-							/>
-						</Steps.Content>
-						<Steps.CompletedContent className='rounded-lg border border-accent-dim bg-surface p-6 text-foreground'>
-							Wszystkie kroki zostały ukończone.
-						</Steps.CompletedContent>
-						{submitState === 'error' && (
-							<p className='text-sm text-danger'>
-								Nie udało się wygenerować PDF. Sprawdź połączenie i spróbuj ponownie.
-							</p>
-						)}
-						<div className='flex justify-between gap-3'>
-							<Steps.PrevTrigger className='rounded-md border border-border bg-surface px-4 py-2 text-sm text-muted transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40'>
-								Wstecz
-							</Steps.PrevTrigger>
-							{isLastStep ? (
-								<button
-									type='button'
-									onClick={generatePdf}
-									disabled={submitState === 'submitting'}
-									className='rounded-md bg-accent px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-accent-dim hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40'
-								>
-									{submitState === 'submitting' ? 'Generowanie…' : 'Zapisz i pobierz PDF'}
-								</button>
-							) : (
-								<button
-									type='button'
-									onClick={handleNext}
-									className='rounded-md bg-accent px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-accent-dim hover:text-foreground'
-								>
-									Dalej
-								</button>
+									<Steps.Trigger className='group flex items-center gap-3 text-left sm:py-1.5'>
+										<Steps.Indicator className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-mono text-sm text-muted transition-colors data-current:border-accent data-current:bg-accent data-current:text-background data-complete:border-accent-dim data-complete:bg-accent-dim data-complete:text-foreground'>
+											{index + 1}
+										</Steps.Indicator>
+										<span className='hidden text-sm text-subtle transition-colors group-data-current:text-foreground group-data-complete:text-muted sm:inline'>
+											{meta.title}
+										</span>
+									</Steps.Trigger>
+									{index < ALL_STEPS.length - 1 && (
+										<Steps.Separator className='mx-3 h-px w-6 flex-none bg-border transition-colors data-complete:bg-accent-dim sm:mx-0 sm:my-1 sm:ml-4.25 sm:h-5 sm:w-px' />
+									)}
+								</Steps.Item>
+							))}
+						</Steps.List>
+						<div className='flex min-w-0 flex-1 flex-col gap-8'>
+							{!isLastStep && (
+								<VoicePanel
+									title='Sterowanie głosem'
+									hint='Odpowiadaj na pytania, potwierdzaj słowem „dalej”. Po sekcji zapytam, czy przejść do kolejnej.'
+									supported={dialogue.supported}
+									running={dialogue.running}
+									log={dialogue.log}
+									error={dialogue.error}
+									onStart={() => void dialogue.start()}
+									onStop={dialogue.stop}
+									unsupportedNote='Sterowanie głosem wymaga przeglądarki Chrome (Android). Wypełnij formularz ręcznie.'
+								/>
 							)}
+							{STEP_META.map((meta, index) => {
+								const StepComponent = STEP_COMPONENTS[meta.key];
+								return (
+									<Steps.Content
+										key={meta.key}
+										index={index}
+										className='rounded-lg border border-border bg-surface p-4 sm:p-6'
+									>
+										<h2 className='mb-4 text-lg font-semibold text-foreground'>{meta.title}</h2>
+										<StepComponent />
+									</Steps.Content>
+								);
+							})}
+							<Steps.Content
+								key={SUMMARY_META.key}
+								index={SUMMARY_INDEX}
+								className='rounded-lg border border-border bg-surface p-4 sm:p-6'
+							>
+								<h2 className='mb-4 text-lg font-semibold text-foreground'>{SUMMARY_META.title}</h2>
+								<StepSummary
+									hiveNumber={hive.number}
+									inspectionNumber={inspectionNumber}
+									weather={weather}
+									weatherState={weatherState}
+									onRefreshWeather={loadWeather}
+									onEdit={handleEdit}
+								/>
+							</Steps.Content>
+							<Steps.CompletedContent className='rounded-lg border border-accent-dim bg-surface p-6 text-foreground'>
+								Wszystkie kroki zostały ukończone.
+							</Steps.CompletedContent>
+							{submitState === 'error' && (
+								<p className='text-sm text-danger'>
+									Nie udało się wygenerować PDF. Sprawdź połączenie i spróbuj ponownie.
+								</p>
+							)}
+							<div className='flex justify-between gap-3'>
+								<Steps.PrevTrigger className='rounded-md border border-border bg-surface px-4 py-2 text-sm text-muted transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40'>
+									Wstecz
+								</Steps.PrevTrigger>
+								{isLastStep ? (
+									<button
+										type='button'
+										onClick={generatePdf}
+										disabled={submitState === 'submitting'}
+										className='rounded-md bg-accent px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-accent-dim hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40'
+									>
+										{submitState === 'submitting' ? 'Generowanie…' : 'Zapisz i pobierz PDF'}
+									</button>
+								) : (
+									<button
+										type='button'
+										onClick={handleNext}
+										className='rounded-md bg-accent px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-accent-dim hover:text-foreground'
+									>
+										Dalej
+									</button>
+								)}
+							</div>
 						</div>
-					</div>
-				</Steps.RootProvider>
-			</form>
-		</FormProvider>
+					</Steps.RootProvider>
+				</form>
+			</FormProvider>
+		</CombViewContext.Provider>
 	);
 }

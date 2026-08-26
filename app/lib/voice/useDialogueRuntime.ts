@@ -22,6 +22,13 @@ import { ListenError, useSpeechIO } from './useSpeechIO';
 export const MAX_MISS_STREAK = 4;
 /** Retries at a single prompt before a script falls back to something simpler. */
 export const MAX_RETRIES = 2;
+/**
+ * How many times the recogniser may time out on silence before the dialogue
+ * says anything. Chrome gives up after roughly five seconds of quiet, which is
+ * nowhere near long enough to set one frame down and lift the next, so waiting
+ * quietly through several of those is the normal case rather than a problem.
+ */
+export const SILENT_RETRIES = 5;
 
 /** Thrown to unwind the async loop when the dialogue is stopped. */
 export class Aborted extends Error {}
@@ -103,16 +110,26 @@ export function useDialogueRuntime(): DialogueRuntime {
 		async <T>(match: (transcript: string) => T | null): Promise<T | null> => {
 			guard();
 
-			let alternatives: string[];
-			try {
-				alternatives = await io.listen();
-			} catch (failure) {
-				guard();
-				if (failure instanceof ListenError && failure.reason === 'not-allowed') {
-					setError('Brak dostępu do mikrofonu. Zezwól na mikrofon albo wpisz dane ręcznie.');
-					throw new Aborted();
+			let alternatives: string[] = [];
+			// Silence is not misrecognition. The recogniser gives up on quiet after
+			// a few seconds, which is far less time than putting one frame down and
+			// lifting the next — so just start listening again, saying nothing.
+			for (let quiet = 0; ; quiet += 1) {
+				try {
+					alternatives = await io.listen();
+					break;
+				} catch (failure) {
+					guard();
+					if (failure instanceof ListenError && failure.reason === 'not-allowed') {
+						setError('Brak dostępu do mikrofonu. Zezwól na mikrofon albo wpisz dane ręcznie.');
+						throw new Aborted();
+					}
+					if (failure instanceof ListenError && failure.reason === 'no-speech' && quiet < SILENT_RETRIES) {
+						continue;
+					}
+					// Long enough to be worth a nudge, or a failure that is not silence.
+					return noteMiss();
 				}
-				return noteMiss();
 			}
 			guard();
 
@@ -134,11 +151,13 @@ export function useDialogueRuntime(): DialogueRuntime {
 	const ask = useCallback(() => askWith(parseCommand), [askWith]);
 
 	const stop = useCallback(() => {
+		const wasRunning = runningRef.current;
 		runningRef.current = false;
 		setRunning(false);
 		io.cancel();
-		// Audible acknowledgement — with the phone pocketed there is nothing to see.
-		void io.speak('Przerwane.');
+		// Audible acknowledgement — with the phone pocketed there is nothing to
+		// see. Only when something was actually interrupted.
+		if (wasRunning) void io.speak('Przerwane.');
 	}, [io]);
 
 	// Leaving the screen must end the dialogue; cancelling I/O alone would leave

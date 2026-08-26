@@ -142,6 +142,15 @@ export function makeFrame(position: number): FrameValues {
 	return { position, comb_state: 'drawn', brood: 0, honey: 0, pollen: 0, wear: 'good' };
 }
 
+/**
+ * Array order is the box, left to right, so position is always derived from it.
+ * Every write goes through this so the chips, the read-back and the payload
+ * cannot drift after a frame is moved, added or removed.
+ */
+export function renumberFrames(frames: FrameValues[]): FrameValues[] {
+	return frames.map((frame, index) => ({ ...frame, position: index + 1 }));
+}
+
 export const combDefaults: DefaultValues<CombValues> = {
 	frame_type: 'wielkopolska',
 	slots: DEFAULT_SLOTS,

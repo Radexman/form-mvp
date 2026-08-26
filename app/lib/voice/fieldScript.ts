@@ -160,9 +160,9 @@ export async function runFieldScript(
 		}
 
 		// --- read back, then wait for an explicit decision --------------------
+		await announce(`${summarise(step, api.getValues())}. Dalej?`);
 		for (;;) {
 			guard();
-			await announce(`${summarise(step, api.getValues())}. Dalej?`);
 
 			const answer = await askWith<Answer | ControlCommand>((transcript) => {
 				// Control words win here, the reverse of a field prompt: after a
@@ -182,11 +182,14 @@ export async function runFieldScript(
 			});
 
 			if (answer === null) {
-				await announce('Nie słyszę. Powtórz proszę.');
+				// Nothing heard for a long while — ask the short question again
+				// rather than reciting the whole step.
+				await announce('Dalej?');
 				continue;
 			}
 			if ('field' in answer) {
 				commit({ [answer.field.name]: answer.value });
+				await announce(`${summarise(step, api.getValues())}. Dalej?`);
 				continue;
 			}
 			switch (answer.kind) {
@@ -200,6 +203,7 @@ export async function runFieldScript(
 					resetMisses();
 					continue restart;
 				case 'repeat':
+					await announce(`${summarise(step, api.getValues())}. Dalej?`);
 					continue;
 			}
 		}
