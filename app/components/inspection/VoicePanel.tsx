@@ -147,11 +147,26 @@ export function VoicePanel({
 	// so it stays here rather than being lifted with `open`.
 	const [expanded, setExpanded] = useState(false);
 
+	// Full screen means the conversation is the only thing scrolling; without
+	// this the page behind keeps moving under the finger once the log hits an end.
+	useEffect(() => {
+		if (!expanded) return;
+		const previous = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		return () => {
+			document.body.style.overflow = previous;
+		};
+	}, [expanded]);
+
 	// Keep the newest turn in view, the way a chat thread does.
 	const logRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		const node = logRef.current;
-		if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+		if (!node) return;
+		// Only follow along when already near the bottom, so scrolling back
+		// through the conversation is not yanked forward by the next turn.
+		const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 120;
+		if (nearBottom) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
 	}, [log.length, running, expanded]);
 
 	if (!supported) return <p className='text-xs text-subtle'>{unsupportedNote}</p>;
@@ -174,7 +189,7 @@ export function VoicePanel({
 			{open && (
 				<section
 					aria-label='Rozmowa'
-					className={`fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface ${expanded ? 'top-0' : ''}`}
+					className={`fixed inset-x-0 bottom-0 z-40 flex flex-col border-t border-border bg-surface ${expanded ? 'top-0 z-50' : ''}`}
 				>
 					{/* Same max-width and gutters as the page, so the bar is full bleed
 					    but its contents line up with the form above it. */}
@@ -210,7 +225,7 @@ export function VoicePanel({
 
 						<div
 							ref={logRef}
-							className={`flex flex-col gap-2.5 overflow-y-auto border-t border-border/60 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
+							className={`flex flex-col gap-2.5 overflow-y-auto overscroll-contain border-t border-border/60 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
 						>
 							{log.map((turn, position) => (
 								<Bubble

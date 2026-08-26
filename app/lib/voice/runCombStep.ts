@@ -102,8 +102,12 @@ export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): P
 		slots: number,
 	): Promise<ConfirmOutcome> => {
 		let draft = initial;
+		// Offering "the next frame" on the last one would promise something that
+		// does not exist; the step is what follows there.
+		const question = position >= slots ? say.CONFIRM_LAST_FRAME : say.CONFIRM_NEXT_FRAME;
+
 		writeDraft(index, draft);
-		await announce(say.readBack(draft, position));
+		await announce(say.readBack(draft, position, question));
 
 		for (;;) {
 			guard();
@@ -112,7 +116,7 @@ export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): P
 			if (!answer) {
 				// Nothing heard for a long while — the short question again, rather
 				// than reciting the whole frame or complaining about the silence.
-				await announce(say.CONFIRM_AGAIN);
+				await announce(question);
 				continue;
 			}
 			switch (answer.kind) {
@@ -131,7 +135,7 @@ export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): P
 					if (applied) {
 						draft = applied;
 						writeDraft(index, draft);
-						await announce(say.readBack(draft, position));
+						await announce(say.readBack(draft, position, question));
 					}
 					continue;
 				}

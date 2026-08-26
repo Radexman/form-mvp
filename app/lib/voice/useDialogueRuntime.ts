@@ -29,6 +29,8 @@ export const MAX_RETRIES = 2;
  * quietly through several of those is the normal case rather than a problem.
  */
 export const SILENT_RETRIES = 5;
+/** Transcript length kept for scrolling back through. */
+export const MAX_LOG_TURNS = 200;
 
 /** Thrown to unwind the async loop when the dialogue is stopped. */
 export class Aborted extends Error {}
@@ -95,7 +97,9 @@ export function useDialogueRuntime(): DialogueRuntime {
 	const loopRef = useRef<Promise<void> | null>(null);
 
 	const push = useCallback((role: DialogueTurn['role'], text: string) => {
-		setLog((entries) => [...entries, { role, text }].slice(-10));
+		// Kept in full so the expanded view can scroll back over the whole
+		// exchange; capped only to bound memory on a very long session.
+		setLog((entries) => [...entries, { role, text }].slice(-MAX_LOG_TURNS));
 	}, []);
 
 	const guard = useCallback(() => {

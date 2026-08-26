@@ -22,8 +22,10 @@ export const ASK_HONEY = 'Miód?';
 export const ASK_POLLEN = 'Pierzga?';
 
 export const NOT_UNDERSTOOD = 'Nie zrozumiałem. Powiedz na przykład: miód osiem, pierzga jeden.';
-/** Re-asked after a long silence — the question again, not a complaint. */
-export const CONFIRM_AGAIN = 'Przejść do kolejnej ramki?';
+/** Asked after each frame's read-back, except the last — there is no next one. */
+export const CONFIRM_NEXT_FRAME = 'Przejść do kolejnej ramki?';
+/** The last frame in the box: the step, not another frame, is what follows. */
+export const CONFIRM_LAST_FRAME = 'Dalej?';
 export const REPAIR_INTRO = 'Zapytam po kolei.';
 export const FINISHED = 'Gotowe. Wszystkie ramki zapisane.';
 export const STOPPED = 'Przerwane.';
@@ -40,12 +42,16 @@ export function overflowWarning(total: number): string {
 	return `To razem ${total * 10} procent, czyli więcej niż cała ramka. Powtórz proszę.`;
 }
 
-/** "Ramka trzecia: miód 80 procent, puste 20 procent, plaster dobry. Przejść do kolejnej ramki?" */
-export function readBack(frame: FrameValues, position: number): string {
+/**
+ * "Ramka trzecia: miód 80 procent, puste 20 procent, plaster dobry. Przejść do
+ * kolejnej ramki?" — the closing question is passed in, since the last frame in
+ * the box has no next frame to offer.
+ */
+export function readBack(frame: FrameValues, position: number, question: string = CONFIRM_NEXT_FRAME): string {
 	const head = `Ramka ${ordinalPl(position)}`;
 
 	if (frame.comb_state === 'foundation') {
-		return `${head}: węza. ${CONFIRM_AGAIN}`;
+		return `${head}: węza. ${question}`;
 	}
 
 	const parts: string[] = [];
@@ -58,5 +64,5 @@ export function readBack(frame: FrameValues, position: number): string {
 
 	if (frame.wear) parts.push(WEAR_SPEECH[frame.wear]);
 
-	return `${head}: ${parts.join(', ')}. ${CONFIRM_AGAIN}`;
+	return `${head}: ${parts.join(', ')}. ${question}`;
 }

@@ -167,6 +167,24 @@ describe('regressions', () => {
 	});
 });
 
+describe('the last frame', () => {
+	// Offering "the next frame" on the last one promises something that does not
+	// exist — the step is what follows there.
+	it('asks a question that fits, rather than offering a next frame', async () => {
+		await run(['dwa', 'pusta', 'dalej', 'pusta', 'dalej']);
+		// Read-backs only; the bare announcements share the same prefix.
+		const readBacks = spoken.filter((line) => line.startsWith('Ramka') && line.includes(':'));
+		expect(readBacks[0]).toContain('Przejść do kolejnej ramki?');
+		expect(readBacks[1]).toContain('Dalej?');
+		expect(readBacks[1]).not.toContain('kolejnej ramki');
+	});
+
+	it('uses the plain question when the box holds one frame', async () => {
+		await run(['jeden', 'pusta', 'dalej']);
+		expect(spoken.some((line) => line.includes('kolejnej ramki'))).toBe(false);
+	});
+});
+
 describe('silence', () => {
 	// The runtime waits out quiet before ever reporting a miss, so the dialogue
 	// must not recite the whole frame back each time it hears nothing.
@@ -174,7 +192,8 @@ describe('silence', () => {
 		await run(['jeden', 'miód 5', '', '', 'dalej']);
 		const readBacks = spoken.filter((line) => line.startsWith('Ramka pierwsza:'));
 		expect(readBacks).toHaveLength(1);
-		expect(spoken.filter((line) => line === 'Przejść do kolejnej ramki?').length).toBeGreaterThan(0);
+		// One frame in the box, so the closing question is the plain one.
+		expect(spoken.filter((line) => line === 'Dalej?').length).toBeGreaterThan(0);
 	});
 });
 
