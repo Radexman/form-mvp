@@ -221,10 +221,7 @@ export function MultiSelectField({
 	placeholder?: string;
 }) {
 	const { control } = useFormContext<FormValues>();
-	const collection = useMemo(
-		() => createListCollection({ items: options, groupBy: (item) => item.group }),
-		[options],
-	);
+	const collection = useMemo(() => createListCollection({ items: options, groupBy: (item) => item.group }), [options]);
 
 	return (
 		<Controller
@@ -387,9 +384,7 @@ export function SwatchField({ name, label, options }: { name: FieldName; label: 
 								className='group flex h-12 w-12 cursor-pointer items-center justify-center rounded-full ring-2 ring-border ring-offset-2 ring-offset-surface transition-all hover:ring-subtle data-[state=checked]:ring-accent'
 								style={{ backgroundColor: SWATCH_COLORS[option.value] ?? 'transparent' }}
 							>
-								<span className='hidden text-base font-bold text-background group-data-[state=checked]:block'>
-									✓
-								</span>
+								<span className='hidden text-base font-bold text-background group-data-[state=checked]:block'>✓</span>
 								<RadioGroup.ItemHiddenInput />
 							</RadioGroup.Item>
 						))}

@@ -322,9 +322,7 @@ export function StepComb() {
 				? current.slice(0, next)
 				: [
 						...current,
-						...Array.from({ length: next - current.length }, (_, offset) =>
-							makeFrame(current.length + offset + 1),
-						),
+						...Array.from({ length: next - current.length }, (_, offset) => makeFrame(current.length + offset + 1)),
 					];
 		setFrames(resized);
 		setActive((position) => Math.min(position, resized.length - 1));
@@ -378,8 +376,8 @@ export function StepComb() {
 	return (
 		<div className='flex flex-col gap-6'>
 			<p className='text-sm text-subtle'>
-				Ramka po ramce, w dziesiątych częściach. Kilogramy miodu i zapasy policzy raport — tu wpisujesz tylko
-				to, co widzisz.
+				Ramka po ramce, w dziesiątych częściach. Kilogramy miodu i zapasy policzy raport — tu wpisujesz tylko to, co
+				widzisz.
 			</p>
 
 			{/* The dialogue asks for slots itself, so it sits above that field. */}
@@ -502,9 +500,7 @@ export function StepComb() {
 									: 'border-border bg-surface-2 hover:border-subtle'
 							}`}
 						>
-							<span
-								className={`font-mono text-xs ${position === index ? 'text-foreground' : 'text-muted'}`}
-							>
+							<span className={`font-mono text-xs ${position === index ? 'text-foreground' : 'text-muted'}`}>
 								{item.position}
 							</span>
 							<FrameFill
@@ -522,8 +518,7 @@ export function StepComb() {
 				<div className='flex flex-col gap-5 rounded-lg border border-border bg-surface-2/50 p-4'>
 					<div className='flex items-center justify-between'>
 						<h3 className='text-base font-semibold text-foreground'>
-							Ramka {frame.position}{' '}
-							<span className='text-sm font-normal text-subtle'>z {frames.length}</span>
+							Ramka {frame.position} <span className='text-sm font-normal text-subtle'>z {frames.length}</span>
 						</h3>
 						<div className='flex gap-2'>
 							<button
@@ -601,12 +596,12 @@ export function StepComb() {
 								<div className='flex justify-between text-xs text-subtle'>
 									<span>Wypełnienie {filled * 10}%</span>
 									<span className='flex items-center gap-1.5'>
-									<span
-										className='h-2 w-2 rounded-full'
-										style={{ background: 'var(--comb-empty)' }}
-									/>
-									Puste {(FRAME_TENTHS - filled) * 10}%
-								</span>
+										<span
+											className='h-2 w-2 rounded-full'
+											style={{ background: 'var(--comb-empty)' }}
+										/>
+										Puste {(FRAME_TENTHS - filled) * 10}%
+									</span>
 								</div>
 							</div>
 

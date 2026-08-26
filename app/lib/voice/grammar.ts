@@ -112,7 +112,13 @@ const WEAR_STEMS: [string, CombCondition][] = [
 
 const FOUNDATION_STEMS = ['wez']; // węza, węzy, wezę
 const EMPTY_STEMS = ['pust']; // pusta, puste, pusty
-const NEXT_WORDS = ['dalej', 'nastepna', 'nastepny', 'zapisz', 'tak', 'ok', 'okej', 'gotowe'];
+/**
+ * "dobrze" and "dobra" are the most natural Polish confirmations, and they also
+ * prefix-match the `dobr` wear stem. Confirmation wins: wear defaults to good
+ * anyway, so losing them as a way to *set* good costs nothing, while losing them
+ * as a way to say yes would strand the confirm prompt.
+ */
+const NEXT_WORDS = ['dalej', 'nastepna', 'nastepny', 'zapisz', 'tak', 'ok', 'okej', 'gotowe', 'dobrze', 'dobra'];
 const BACK_WORDS = ['wstecz', 'poprzednia', 'poprzedni'];
 const UNDO_WORDS = ['cofnij', 'popraw', 'poprawka', 'zle', 'nie'];
 const REPEAT_WORDS = ['powtorz', 'powtorka'];
@@ -183,6 +189,9 @@ export function parseCommand(raw: string): Command | null {
 
 	for (let i = 0; i < tokens.length; i += 1) {
 		const token = tokens[i];
+
+		// Confirmations are never frame content, even when they look like a stem.
+		if (NEXT_WORDS.includes(token)) continue;
 
 		if (startsWithAny(token, FOUNDATION_STEMS)) {
 			state = 'foundation';

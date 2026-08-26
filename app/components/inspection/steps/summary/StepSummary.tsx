@@ -116,7 +116,9 @@ export function StepSummary({
 
 	return (
 		<div className='flex flex-col gap-6'>
-			<p className='text-sm text-subtle'>Sprawdź dane przed wygenerowaniem raportu PDF. Dotknij sekcji, aby ją poprawić.</p>
+			<p className='text-sm text-subtle'>
+				Sprawdź dane przed wygenerowaniem raportu PDF. Dotknij sekcji, aby ją poprawić.
+			</p>
 
 			<section className='flex flex-col gap-3'>
 				<div>
@@ -124,8 +126,14 @@ export function StepSummary({
 					<p className='text-sm text-subtle'>Podstawowe dane przeglądu — pobrane automatycznie.</p>
 				</div>
 				<div className='grid grid-cols-2 gap-3'>
-					<MetaCard label='Ul' value={meta.hive_number} />
-					<MetaCard label='Data' value={formatDatePl(meta.inspection_date)} />
+					<MetaCard
+						label='Ul'
+						value={meta.hive_number}
+					/>
+					<MetaCard
+						label='Data'
+						value={formatDatePl(meta.inspection_date)}
+					/>
 				</div>
 			</section>
 
@@ -144,10 +152,22 @@ export function StepSummary({
 				{weatherState === 'loading' && <Empty text='Pobieranie danych pogodowych…' />}
 				{weatherState !== 'loading' && weather && (
 					<div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
-						<WeatherCard value={`${weather.temp}°`} label='Temperatura' />
-						<WeatherCard value={`${weather.humidity}%`} label='Wilgotność' />
-						<WeatherCard value={`${weather.wind}`} label='Wiatr km/h' />
-						<WeatherCard value={`${weather.cloud_cover}%`} label='Zachmurzenie' />
+						<WeatherCard
+							value={`${weather.temp}°`}
+							label='Temperatura'
+						/>
+						<WeatherCard
+							value={`${weather.humidity}%`}
+							label='Wilgotność'
+						/>
+						<WeatherCard
+							value={`${weather.wind}`}
+							label='Wiatr km/h'
+						/>
+						<WeatherCard
+							value={`${weather.cloud_cover}%`}
+							label='Zachmurzenie'
+						/>
 					</div>
 				)}
 				{weatherState !== 'loading' && !weather && (
@@ -158,8 +178,15 @@ export function StepSummary({
 			</section>
 
 			<section className='flex flex-col gap-3'>
-				<Section title='Matka' stepKey='queen' onEdit={onEdit}>
-					<Row label='Status' value={labelOf(QUEEN_STATUS_OPTIONS, v.queen_status)} />
+				<Section
+					title='Matka'
+					stepKey='queen'
+					onEdit={onEdit}
+				>
+					<Row
+						label='Status'
+						value={labelOf(QUEEN_STATUS_OPTIONS, v.queen_status)}
+					/>
 					{v.queen_status !== 'missing' && (
 						<Row
 							label='Znakowana'
@@ -170,25 +197,61 @@ export function StepSummary({
 							}
 						/>
 					)}
-					<Row label='Mateczniki' value={labelOf(QUEEN_CELLS_OPTIONS, v.queen_cells)} />
+					<Row
+						label='Mateczniki'
+						value={labelOf(QUEEN_CELLS_OPTIONS, v.queen_cells)}
+					/>
 					{v.queen_cells && v.queen_cells !== 'none' && (
-						<Row label='Liczba mateczników' value={v.queen_cells_count} />
+						<Row
+							label='Liczba mateczników'
+							value={v.queen_cells_count}
+						/>
 					)}
 				</Section>
 
-				<Section title='Czerw' stepKey='brood' onEdit={onEdit}>
-					<Row label='Stadia' value={broodTypes.length ? broodTypes.join(', ') : '—'} />
-					<Row label='Zwartość' value={`${v.brood_pattern ?? '—'} / 5`} />
+				<Section
+					title='Czerw'
+					stepKey='brood'
+					onEdit={onEdit}
+				>
+					<Row
+						label='Stadia'
+						value={broodTypes.length ? broodTypes.join(', ') : '—'}
+					/>
+					<Row
+						label='Zwartość'
+						value={`${v.brood_pattern ?? '—'} / 5`}
+					/>
 				</Section>
 
-				<Section title='Rodzina' stepKey='colony' onEdit={onEdit}>
-					<Row label='Obsiadane ramki' value={v.frames_covered} />
-					<Row label='Zachowanie' value={labelOf(COLONY_BEHAVIOR_OPTIONS, v.behavior)} />
-					<Row label='Przestrzeń' value={labelOf(COLONY_HIVE_SPACE_OPTIONS, v.hive_space)} />
+				<Section
+					title='Rodzina'
+					stepKey='colony'
+					onEdit={onEdit}
+				>
+					<Row
+						label='Obsiadane ramki'
+						value={v.frames_covered}
+					/>
+					<Row
+						label='Zachowanie'
+						value={labelOf(COLONY_BEHAVIOR_OPTIONS, v.behavior)}
+					/>
+					<Row
+						label='Przestrzeń'
+						value={labelOf(COLONY_HIVE_SPACE_OPTIONS, v.hive_space)}
+					/>
 				</Section>
 
-				<Section title='Plastry i zasoby' stepKey='comb' onEdit={onEdit}>
-					<Row label='Ramki' value={`${v.frames?.length ?? 0} z ${v.slots} miejsc`} />
+				<Section
+					title='Plastry i zasoby'
+					stepKey='comb'
+					onEdit={onEdit}
+				>
+					<Row
+						label='Ramki'
+						value={`${v.frames?.length ?? 0} z ${v.slots} miejsc`}
+					/>
 					<Row
 						label='Czerw'
 						accent='var(--comb-brood)'
@@ -209,32 +272,73 @@ export function StepSummary({
 						accent='var(--comb-empty)'
 						value={`${formatPl(comb.empty_frames_equiv)} ramki`}
 					/>
-					<Row label='Węza' value={comb.foundation_frames} />
-					<Row label='Zapasy miodu' value={labelOf(HONEY_SUFFICIENCY_OPTIONS, comb.honey_stores)} />
-					<Row label='Stan plastrów' value={labelOf(COMB_CONDITION_OPTIONS, comb.comb_condition)} />
-					{comb.unrated_frames > 0 && <Row label='Bez oceny plastra' value={`${comb.unrated_frames} ramki`} />}
+					<Row
+						label='Węza'
+						value={comb.foundation_frames}
+					/>
+					<Row
+						label='Zapasy miodu'
+						value={labelOf(HONEY_SUFFICIENCY_OPTIONS, comb.honey_stores)}
+					/>
+					<Row
+						label='Stan plastrów'
+						value={labelOf(COMB_CONDITION_OPTIONS, comb.comb_condition)}
+					/>
+					{comb.unrated_frames > 0 && (
+						<Row
+							label='Bez oceny plastra'
+							value={`${comb.unrated_frames} ramki`}
+						/>
+					)}
 				</Section>
 
-				<Section title='Wykonane działania' stepKey='actions' onEdit={onEdit}>
+				<Section
+					title='Wykonane działania'
+					stepKey='actions'
+					onEdit={onEdit}
+				>
 					{actions.length || v.other?.trim() ? (
 						<>
-							{actions.length > 0 && <Row label='Działania' value={actions.join(', ')} />}
-							{v.other?.trim() && <Row label='Inne' value={v.other} />}
+							{actions.length > 0 && (
+								<Row
+									label='Działania'
+									value={actions.join(', ')}
+								/>
+							)}
+							{v.other?.trim() && (
+								<Row
+									label='Inne'
+									value={v.other}
+								/>
+							)}
 						</>
 					) : (
 						<Empty text='Brak działań' />
 					)}
 				</Section>
 
-				<Section title='Zdrowie rodziny' stepKey='health' onEdit={onEdit}>
+				<Section
+					title='Zdrowie rodziny'
+					stepKey='health'
+					onEdit={onEdit}
+				>
 					{v.condition_observed ? (
 						<>
-							<Row label='Objawy' value={conditions.length ? conditions.join(', ') : '—'} />
+							<Row
+								label='Objawy'
+								value={conditions.length ? conditions.join(', ') : '—'}
+							/>
 							{v.conditions?.includes('varroa') && (
-								<Row label='Osyp warrozy (24h)' value={v.varroa_drop_count ?? '—'} />
+								<Row
+									label='Osyp warrozy (24h)'
+									value={v.varroa_drop_count ?? '—'}
+								/>
 							)}
 							{v.conditions?.includes('other') && v.health_other?.trim() && (
-								<Row label='Opis' value={v.health_other} />
+								<Row
+									label='Opis'
+									value={v.health_other}
+								/>
 							)}
 						</>
 					) : (
@@ -242,7 +346,11 @@ export function StepSummary({
 					)}
 				</Section>
 
-				<Section title='Uwagi' stepKey='notes' onEdit={onEdit}>
+				<Section
+					title='Uwagi'
+					stepKey='notes'
+					onEdit={onEdit}
+				>
 					{v.notes?.trim() ? <p className='text-sm text-foreground'>{v.notes}</p> : <Empty text='Brak uwag' />}
 				</Section>
 			</section>

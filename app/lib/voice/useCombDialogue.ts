@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
 	FRAME_TENTHS,
@@ -8,6 +8,7 @@ import {
 	makeFrame,
 	type FrameValues,
 } from '../../components/inspection/steps/comb/comb.schema';
+import { applyFrameCommand } from './applyFrameCommand';
 import { parseCommand, type Command } from './grammar';
 import * as say from './phrases';
 import { ListenError, useSpeechIO } from './useSpeechIO';
@@ -42,10 +43,7 @@ export interface DialogueTurn {
 /** Thrown to unwind the async loop when the dialogue is stopped. */
 class Aborted extends Error {}
 
-type ConfirmOutcome =
-	| { kind: 'commit' }
-	| { kind: 'jump'; position: number }
-	| { kind: 'redo'; draft: FrameValues };
+type ConfirmOutcome = { kind: 'commit' } | { kind: 'jump'; position: number } | { kind: 'redo'; draft: FrameValues };
 
 export interface CombDialogueApi {
 	/** Read fresh each turn — the loop outlives any single render. */
@@ -66,6 +64,8 @@ export function useCombDialogue(api: CombDialogueApi) {
 
 	const runningRef = useRef(false);
 	const missStreakRef = useRef(0);
+	/** The in-flight dialogue, so a restart can wait for it to unwind. */
+	const loopRef = useRef<Promise<void> | null>(null);
 	// Callbacks reached through a ref so the long-lived loop never goes stale.
 	const apiRef = useRef(api);
 	apiRef.current = api;
@@ -88,6 +88,16 @@ export function useCombDialogue(api: CombDialogueApi) {
 		[guard, io, push],
 	);
 
+	/** Count a turn we could not act on, and give up once they pile up. */
+	const noteMiss = useCallback((): null => {
+		missStreakRef.current += 1;
+		if (missStreakRef.current >= MAX_MISS_STREAK) {
+			setError('Nie słyszę odpowiedzi — dyktowanie zatrzymane. Możesz wpisać ramki ręcznie.');
+			throw new Aborted();
+		}
+		return null;
+	}, []);
+
 	/**
 	 * One turn: take the first alternative the grammar accepts, else null.
 	 * Tracks consecutive failures across every prompt and ends the dialogue once
@@ -95,15 +105,6 @@ export function useCombDialogue(api: CombDialogueApi) {
 	 */
 	const ask = useCallback(async (): Promise<Command | null> => {
 		guard();
-
-		const miss = () => {
-			missStreakRef.current += 1;
-			if (missStreakRef.current >= MAX_MISS_STREAK) {
-				setError('Nie słyszę odpowiedzi — dyktowanie zatrzymane. Możesz wpisać ramki ręcznie.');
-				throw new Aborted();
-			}
-			return null;
-		};
 
 		let alternatives: string[];
 		try {
@@ -114,7 +115,7 @@ export function useCombDialogue(api: CombDialogueApi) {
 				setError('Brak dostępu do mikrofonu. Zezwól na mikrofon albo wpisz ramki ręcznie.');
 				throw new Aborted();
 			}
-			return miss();
+			return noteMiss();
 		}
 		guard();
 
@@ -127,36 +128,21 @@ export function useCombDialogue(api: CombDialogueApi) {
 			}
 		}
 		if (alternatives[0]) push('you', alternatives[0]);
-		return miss();
-	}, [guard, io, push]);
+		return noteMiss();
+	}, [guard, io, noteMiss, push]);
 
 	const writeDraft = useCallback((index: number, draft: FrameValues) => {
 		apiRef.current.setFrames(apiRef.current.getFrames().map((frame, i) => (i === index ? draft : frame)));
 	}, []);
 
-	/** Merge a command onto a draft, refusing anything over one full frame. */
+	/** Merge a command onto a draft, saying out loud why anything was refused. */
 	const applyCommand = useCallback(
 		async (draft: FrameValues, command: Command): Promise<FrameValues | null> => {
 			if (command.kind !== 'frame') return draft;
-
-			const next: FrameValues = {
-				...draft,
-				...command.values,
-				...(command.state ? { comb_state: command.state } : {}),
-				...(command.wear ? { wear: command.wear } : {}),
-			};
-
-			if (next.comb_state === 'foundation') {
-				return { ...next, brood: 0, honey: 0, pollen: 0, wear: null };
-			}
-			if (next.wear === null) next.wear = 'good';
-
-			const total = next.brood + next.honey + next.pollen;
-			if (total > FRAME_TENTHS) {
-				await announce(say.overflowWarning(total));
-				return null;
-			}
-			return next;
+			const result = applyFrameCommand(draft, command);
+			if (result.ok) return result.frame;
+			await announce(say.overflowWarning(result.total));
+			return null;
 		},
 		[announce],
 	);
@@ -179,6 +165,9 @@ export function useCombDialogue(api: CombDialogueApi) {
 	const repairFrame = useCallback(
 		async (draft: FrameValues): Promise<FrameValues> => {
 			setPhase('repair');
+			// Reaching repair already cost MAX_RETRIES misses; without clearing the
+			// streak a single unclear answer here would abort the whole dialogue.
+			missStreakRef.current = 0;
 			await announce(say.REPAIR_INTRO);
 
 			const questions = [
@@ -187,7 +176,13 @@ export function useCombDialogue(api: CombDialogueApi) {
 				{ key: 'pollen', prompt: say.ASK_POLLEN },
 			] as const;
 
-			let next: FrameValues = { ...draft, comb_state: 'drawn', brood: 0, honey: 0, pollen: 0 };
+			let next: FrameValues = {
+				...draft,
+				comb_state: 'drawn',
+				brood: 0,
+				honey: 0,
+				pollen: 0,
+			};
 			for (const { key, prompt } of questions) {
 				await announce(prompt);
 				const command = await ask();
@@ -251,61 +246,85 @@ export function useCombDialogue(api: CombDialogueApi) {
 			const index = position - 1;
 			apiRef.current.setActive(index);
 
-			let draft = makeFrame(position);
-			let misses = 0;
+			// What the frame held before this visit. The draft is written through as
+			// it is dictated so the screen mirrors the conversation, so leaving
+			// without confirming has to put the previous values back.
+			const snapshot = apiRef.current.getFrames()[index] ?? makeFrame(position);
+			let committed = false;
 
-			setPhase('frame');
-			await announce(say.announceFrame(position));
+			try {
+				let draft = makeFrame(position);
+				let misses = 0;
 
-			for (;;) {
-				guard();
-				const command = await ask();
-
-				if (!command) {
-					misses += 1;
-					if (misses <= MAX_RETRIES) {
-						await announce(say.NOT_UNDERSTOOD);
-						continue;
-					}
-					draft = await repairFrame(draft);
-					misses = 0;
-				} else {
-					switch (command.kind) {
-						case 'stop':
-							throw new Aborted();
-						case 'back':
-							return Math.max(1, position - 1);
-						case 'goto':
-							return clamp(command.position, 1, slots);
-						case 'undo':
-							draft = makeFrame(position);
-							await announce(say.announceFrame(position));
-							continue;
-						case 'frame': {
-							// At this prompt an utterance describes the whole frame, so it
-							// replaces rather than merges; amendments happen at confirm.
-							const applied = await applyCommand(makeFrame(position), command);
-							if (!applied) continue;
-							draft = applied;
-							break;
-						}
-						case 'repeat':
-							break;
-						default:
-							continue;
-					}
-				}
-
-				const outcome = await confirmFrame(draft, position, index, slots);
-				if (outcome.kind === 'commit') return position + 1;
-				if (outcome.kind === 'jump') return outcome.position;
-
-				draft = outcome.draft;
 				setPhase('frame');
 				await announce(say.announceFrame(position));
+
+				for (;;) {
+					guard();
+					const command = await ask();
+
+					if (!command) {
+						misses += 1;
+						if (misses <= MAX_RETRIES) {
+							await announce(say.NOT_UNDERSTOOD);
+							continue;
+						}
+						draft = await repairFrame(draft);
+						misses = 0;
+					} else {
+						switch (command.kind) {
+							case 'stop':
+								throw new Aborted();
+							case 'back':
+								return Math.max(1, position - 1);
+							case 'goto':
+								return clamp(command.position, 1, slots);
+							case 'next':
+								// Nothing was dictated, so the frame is what was announced:
+								// drawn and empty. There is nothing to mishear, so commit it.
+								writeDraft(index, draft);
+								committed = true;
+								return position + 1;
+							case 'undo':
+								draft = makeFrame(position);
+								await announce(say.announceFrame(position));
+								continue;
+							case 'frame': {
+								// At this prompt an utterance describes the whole frame, so it
+								// replaces rather than merges; amendments happen at confirm.
+								const applied = await applyCommand(makeFrame(position), command);
+								if (!applied) continue;
+								draft = applied;
+								break;
+							}
+							case 'repeat':
+								await announce(say.announceFrame(position));
+								continue;
+							default:
+								// A bare number here is ambiguous — say so rather than
+								// re-listening in silence.
+								noteMiss();
+								await announce(say.NOT_UNDERSTOOD);
+								continue;
+						}
+					}
+
+					const outcome = await confirmFrame(draft, position, index, slots);
+					if (outcome.kind === 'commit') {
+						committed = true;
+						return position + 1;
+					}
+					if (outcome.kind === 'jump') return outcome.position;
+
+					draft = outcome.draft;
+					setPhase('frame');
+					await announce(say.announceFrame(position));
+				}
+			} finally {
+				if (!committed) writeDraft(index, snapshot);
 			}
 		},
-		[announce, applyCommand, ask, confirmFrame, guard, repairFrame],
+		[announce, applyCommand, ask, confirmFrame, guard, noteMiss, repairFrame, writeDraft],
 	);
 
 	const stop = useCallback(() => {
@@ -313,13 +332,36 @@ export function useCombDialogue(api: CombDialogueApi) {
 		setRunning(false);
 		io.cancel();
 		setPhase('idle');
+		// Audible acknowledgement — with the phone pocketed there is nothing to see.
+		void io.speak(say.STOPPED);
 	}, [io]);
+
+	// Leaving the step must end the dialogue; cancelling I/O alone would leave the
+	// loop running and still writing into an unmounted form.
+	const teardownRef = useRef(io.cancel);
+	teardownRef.current = io.cancel;
+	useEffect(
+		() => () => {
+			runningRef.current = false;
+			teardownRef.current();
+		},
+		[],
+	);
 
 	const start = useCallback(async () => {
 		if (runningRef.current) return;
 		if (!io.supported) {
 			setError('Ta przeglądarka nie obsługuje rozpoznawania mowy. Użyj Chrome na Androidzie.');
 			return;
+		}
+
+		// A previous run may still be unwinding; let it finish so its teardown
+		// cannot tear down this one.
+		const previous = loopRef.current;
+		if (previous) {
+			runningRef.current = false;
+			io.cancel();
+			await previous;
 		}
 
 		runningRef.current = true;
@@ -329,30 +371,47 @@ export function useCombDialogue(api: CombDialogueApi) {
 		setLog([]);
 		await io.primeMicrophone();
 
-		try {
-			const slots = await askSlots();
-			apiRef.current.setSlots(slots);
-			apiRef.current.setFrames(Array.from({ length: slots }, (_, i) => makeFrame(i + 1)));
+		const task = (async () => {
+			try {
+				const slots = await askSlots();
+				apiRef.current.setSlots(slots);
+				// Resize rather than rebuild: frames already entered — by hand or by an
+				// earlier run — survive, and each is overwritten only once confirmed.
+				const existing = apiRef.current.getFrames();
+				apiRef.current.setFrames(
+					Array.from({ length: slots }, (_, i) => ({
+						...(existing[i] ?? makeFrame(i + 1)),
+						position: i + 1,
+					})),
+				);
 
-			let position = 1;
-			while (position <= slots) {
+				let position = 1;
+				while (position <= slots) {
+					guard();
+					position = await runFrame(position, slots);
+				}
+
 				guard();
-				position = await runFrame(position, slots);
+				setPhase('done');
+				await announce(say.FINISHED);
+			} catch (failure) {
+				if (!(failure instanceof Aborted)) {
+					console.error('Voice dialogue failed:', failure);
+					setError('Rozpoznawanie mowy przerwane. Spróbuj ponownie albo wpisz ręcznie.');
+				}
+				setPhase('idle');
+			} finally {
+				runningRef.current = false;
+				setRunning(false);
+				io.cancel();
 			}
+		})();
 
-			guard();
-			setPhase('done');
-			await announce(say.FINISHED);
-		} catch (failure) {
-			if (!(failure instanceof Aborted)) {
-				console.error('Voice dialogue failed:', failure);
-				setError('Rozpoznawanie mowy przerwane. Spróbuj ponownie albo wpisz ręcznie.');
-			}
-			setPhase('idle');
+		loopRef.current = task;
+		try {
+			await task;
 		} finally {
-			runningRef.current = false;
-			setRunning(false);
-			io.cancel();
+			if (loopRef.current === task) loopRef.current = null;
 		}
 	}, [announce, askSlots, guard, io, runFrame]);
 
