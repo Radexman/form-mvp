@@ -66,6 +66,8 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	const [weatherState, setWeatherState] = useState<WeatherState>('idle');
 	// Comb's visible frame lives here so the spoken dialogue can move it.
 	const [activeFrame, setActiveFrame] = useState(0);
+	// A finished transcript can be closed without stopping anything.
+	const [transcriptDismissed, setTranscriptDismissed] = useState(false);
 
 	const steps = useSteps({
 		count: TOTAL_STEPS,
@@ -98,6 +100,10 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 				}),
 		},
 	});
+
+	// The conversation bar is docked rather than overlaid, so the form reserves
+	// room for it instead of letting it cover the controls.
+	const voiceOpen = dialogue.running || (dialogue.log.length > 0 && !transcriptDismissed);
 
 	const loadWeather = useCallback(async () => {
 		setWeatherState('loading');
@@ -159,7 +165,7 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 			<FormProvider {...methods}>
 				<form
 					onSubmit={(event) => event.preventDefault()}
-					className='mx-auto flex w-full max-w-6xl flex-col gap-8'
+					className={`mx-auto flex w-full max-w-6xl flex-col gap-8 ${voiceOpen ? 'pb-[46dvh]' : ''}`}
 				>
 					<div className='flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between'>
 						<div className='flex items-center gap-3'>
@@ -220,7 +226,12 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 									running={dialogue.running}
 									log={dialogue.log}
 									error={dialogue.error}
-									onStart={() => void dialogue.start()}
+									open={voiceOpen}
+									onDismiss={() => setTranscriptDismissed(true)}
+									onStart={() => {
+										setTranscriptDismissed(false);
+										void dialogue.start();
+									}}
 									onStop={dialogue.stop}
 									unsupportedNote='Sterowanie głosem wymaga przeglądarki Chrome (Android). Wypełnij formularz ręcznie.'
 								/>
