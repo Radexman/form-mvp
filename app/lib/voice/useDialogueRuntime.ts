@@ -36,17 +36,20 @@ export const MAX_RETRIES = 2;
  * a ping. With a five-second cycle the gap sets the share of time we can hear at
  * all: 2s is 71%, 5s is 50%, 12s only 29%. Hence the ceiling of 5s below.
  *
- * The cheaper lever is the lead-in. Silence we can predict — the beekeeper cannot
- * answer while still lifting a frame — costs nothing to sit out, where a gap buys
- * quiet by gambling that they will not speak. Spend the predictable silence up
- * front, then stay near-continuous once an answer is actually plausible.
+ * That leaves only *where* the gaps go, and never at the front: the mic opens the
+ * moment a question stops being asked. A lead-in was tried as a way of sitting out
+ * silence we thought we could predict, but the prediction is not ours to make —
+ * the answer often comes straight back, and one spent that way is lost with
+ * nothing on screen to say so.
  */
 export type Pacing = 'prompt' | 'work';
 
 interface PacingProfile {
-	/** Quiet time before the mic opens at all. */
-	leadInMs: number;
-	/** Quiet time before each reopen; the length is how many reopens a turn gets. */
+	/**
+	 * Quiet time before each reopen; the length is how many reopens a turn gets.
+	 * The first entry is what follows the opening window, so a turn always begins
+	 * listening — there is no way to express a deaf stretch before the first one.
+	 */
 	gapsMs: number[];
 }
 
@@ -58,14 +61,14 @@ export const PACING: Record<Pacing, PacingProfile> = {
 	 * and hears a single ping; the rest of the schedule only ever appears when
 	 * something has already gone wrong.
 	 */
-	prompt: { leadInMs: 0, gapsMs: [0, 0] },
+	prompt: { gapsMs: [0, 0] },
 	/**
-	 * Dictating a frame. There is nothing to say until it is out and read, so the
-	 * lead-in sits out a silence we could have predicted rather than spending a
-	 * ping on it. After that the gaps stay short — this is the step whose answers
-	 * the report is actually made of, and dropping one is worse than a ping.
+	 * Dictating a frame. The mic opens the same way — the frame is often already
+	 * out and the answer immediate — but the turn is given more reopens, because
+	 * this is the step the report is actually made of and a dropped answer costs
+	 * more here than a ping does.
 	 */
-	work: { leadInMs: 3_000, gapsMs: [0, 2_000, 4_000, 5_000, 5_000] },
+	work: { gapsMs: [0, 2_000, 4_000, 5_000, 5_000] },
 };
 /** Transcript length kept for scrolling back through. */
 export const MAX_LOG_TURNS = 200;
@@ -195,13 +198,6 @@ export function useDialogueRuntime(): DialogueRuntime {
 		async <T>(match: (transcript: string) => T | null, pacing: Pacing = 'prompt'): Promise<T | null> => {
 			guard();
 			const profile = PACING[pacing];
-
-			// Silence we already knew about; opening the mic through it would spend a
-			// ping on a stretch nobody was going to speak in.
-			if (profile.leadInMs > 0) {
-				await pause(profile.leadInMs);
-				guard();
-			}
 
 			let alternatives: string[] = [];
 			// Silence is not misrecognition. The recogniser gives up on quiet after a

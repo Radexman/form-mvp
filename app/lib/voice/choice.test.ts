@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { choicesFrom, matchBoolean, matchChoice, matchNumber } from './choice';
+import { choicesFrom, matchBoolean, matchChoice, matchMulti, matchNumber } from './choice';
 
 const COLORS = choicesFrom(
 	[
@@ -91,5 +91,66 @@ describe('matchNumber', () => {
 
 	it('rejects values outside the range', () => {
 		expect(matchNumber('zero', 1, 50)).toBeNull();
+	});
+
+	it('takes a value described rather than counted', () => {
+		expect(matchNumber('zwarty', 1, 5, { 5: ['zwart'] })).toBe(5);
+	});
+
+	// A spoken number is never a description, whatever the synonyms say.
+	it('prefers a number when both could match', () => {
+		expect(matchNumber('dwa, zwarty', 1, 5, { 5: ['zwart'] })).toBe(2);
+	});
+
+	it('ignores a description outside the field range', () => {
+		expect(matchNumber('zwarty', 1, 4, { 5: ['zwart'] })).toBeNull();
+	});
+});
+
+describe('matchMulti', () => {
+	const TYPES = choicesFrom(
+		[
+			{ value: 'eggs', label: 'Jaja' },
+			{ value: 'open', label: 'Otwarty' },
+			{ value: 'capped', label: 'Kryty' },
+		],
+		{ open: ['larw'] },
+	);
+	const PHRASES = { none: ['brak', 'nie ma'], all: ['wszystk'] };
+
+	it('takes every option named in one utterance', () => {
+		expect(matchMulti('jaja, larwy i kryty', TYPES, PHRASES)).toEqual(['eggs', 'open', 'capped']);
+	});
+
+	// However they were spoken, so the read-back reads the same way every time.
+	it('returns them in the order the options are declared', () => {
+		expect(matchMulti('kryty i jaja', TYPES, PHRASES)).toEqual(['eggs', 'capped']);
+	});
+
+	it('names an option only once, however many of its phrases hit', () => {
+		expect(matchMulti('otwarty, larwy', TYPES, PHRASES)).toEqual(['open']);
+	});
+
+	it('reads an explicit none-phrase as an empty list', () => {
+		expect(matchMulti('brak', TYPES, PHRASES)).toEqual([]);
+		expect(matchMulti('nie ma', TYPES, PHRASES)).toEqual([]);
+	});
+
+	it('takes them all at once', () => {
+		expect(matchMulti('wszystko', TYPES, PHRASES)).toEqual(['eggs', 'open', 'capped']);
+	});
+
+	// An empty list is an answer and null is a request to repeat; a caller that
+	// cannot tell them apart would record "no brood" every time it mishears.
+	it('returns null rather than an empty list when nothing matched', () => {
+		expect(matchMulti('yyy', TYPES, PHRASES)).toBeNull();
+		expect(matchMulti('', TYPES, PHRASES)).toBeNull();
+	});
+
+	// "brak trutowego" — recording the option would be the opposite of what was
+	// said, and nothing here can tell which half of the utterance was meant.
+	it('refuses an utterance that names an option and denies it', () => {
+		expect(matchMulti('brak kryty', TYPES, PHRASES)).toBeNull();
+		expect(matchMulti('brak wszystkiego', TYPES, PHRASES)).toBeNull();
 	});
 });
