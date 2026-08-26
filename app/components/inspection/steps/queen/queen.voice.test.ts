@@ -13,6 +13,7 @@ function harness(script: string[]) {
 	const spoken: string[] = [];
 	const queue = [...script];
 	let values: FieldValues = { ...queenDefaults };
+	const status: Record<string, unknown> = {};
 	let turns = 0;
 
 	const runtime = {
@@ -35,6 +36,9 @@ function harness(script: string[]) {
 		noteMiss: () => null,
 		guard: () => {},
 		resetMisses: () => {},
+		setStatus: (patch: Record<string, unknown>) => {
+			Object.assign(status, patch);
+		},
 		run: async () => {},
 		stop: () => {},
 	} as unknown as DialogueRuntime;
@@ -46,13 +50,13 @@ function harness(script: string[]) {
 		},
 	};
 
-	return { runtime, api, spoken, values: () => values };
+	return { runtime, api, spoken, status, values: () => values };
 }
 
 const run = async (script: string[]) => {
 	const h = harness(script);
 	const outcome = await runFieldScript(h.runtime, queenVoiceStep, h.api);
-	return { outcome, values: h.values(), spoken: h.spoken };
+	return { outcome, values: h.values(), spoken: h.spoken, status: h.status };
 };
 
 describe('queen script — the ordinary case', () => {
@@ -154,6 +158,19 @@ describe('queen script — navigation', () => {
 
 	it('stops the whole dialogue on "stop"', async () => {
 		await expect(run(['widziana', 'stop'])).rejects.toBeInstanceOf(Aborted);
+	});
+});
+
+describe('status published for the screen', () => {
+	it('names the field being asked, so the form can scroll to it', async () => {
+		const { status } = await run(['widziana', 'tak', 'niebieski', 'brak', 'dalej']);
+		// Cleared once the step as a whole is being confirmed.
+		expect(status.fieldName).toBeNull();
+	});
+
+	it('carries the same summary the read-back speaks', async () => {
+		const { status } = await run(['widziana', 'nie', 'brak', 'dalej']);
+		expect(status.summary).toBe('matka widziana, nieznakowana, mateczniki brak');
 	});
 });
 

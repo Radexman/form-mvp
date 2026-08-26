@@ -15,6 +15,7 @@ const spoken: string[] = [];
 let queue: string[] = [];
 let missStreak = 0;
 let turns = 0;
+const status: Record<string, unknown> = {};
 
 function makeRuntime(): DialogueRuntime {
 	return {
@@ -47,6 +48,9 @@ function makeRuntime(): DialogueRuntime {
 			missStreak = 0;
 		},
 		setError: () => {},
+		setStatus: (patch: Record<string, unknown>) => {
+			Object.assign(status, patch);
+		},
 	} as unknown as DialogueRuntime;
 }
 
@@ -82,6 +86,7 @@ beforeEach(() => {
 	queue = [];
 	missStreak = 0;
 	turns = 0;
+	for (const key of Object.keys(status)) delete status[key];
 });
 
 describe('the happy path', () => {
@@ -99,6 +104,11 @@ describe('the happy path', () => {
 		await run(['jeden', 'pusta', 'dalej']);
 		expect(spoken[0]).toBe('Miejsca w gnieździe?');
 		expect(said('Ramka pierwsza')).toBe(true);
+	});
+
+	it('publishes which frame it is on, so the screen can follow', async () => {
+		await run(['dwa', 'pusta', 'dalej', 'pusta', 'dalej']);
+		expect(status.summary).toBe('Ramka druga z 2');
 	});
 });
 
@@ -164,7 +174,7 @@ describe('silence', () => {
 		await run(['jeden', 'miód 5', '', '', 'dalej']);
 		const readBacks = spoken.filter((line) => line.startsWith('Ramka pierwsza:'));
 		expect(readBacks).toHaveLength(1);
-		expect(spoken.filter((line) => line === 'Dalej?').length).toBeGreaterThan(0);
+		expect(spoken.filter((line) => line === 'Przejść do kolejnej ramki?').length).toBeGreaterThan(0);
 	});
 });
 

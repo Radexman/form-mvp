@@ -37,7 +37,7 @@ export interface CombStepApi {
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): Promise<StepOutcome> {
-	const { announce, ask, guard, noteMiss, resetMisses, setError } = runtime;
+	const { announce, ask, guard, noteMiss, resetMisses, setError, setStatus } = runtime;
 
 	const writeDraft = (index: number, draft: FrameValues) => {
 		api.setFrames(api.getFrames().map((frame, i) => (i === index ? draft : frame)));
@@ -145,6 +145,7 @@ export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): P
 	const runFrame = async (position: number, slots: number): Promise<number> => {
 		const index = position - 1;
 		api.setActive(index);
+		setStatus({ summary: `${say.announceFrame(position)} z ${slots}` });
 
 		// What the frame held before this visit. The draft is written through as it
 		// is dictated so the screen mirrors the conversation, so leaving without

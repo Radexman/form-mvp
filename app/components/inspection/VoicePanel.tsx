@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { DialogueTurn } from '../../lib/voice/useDialogueRuntime';
 
@@ -61,6 +61,23 @@ function StopIcon({ className = 'h-5 w-5' }: { className?: string }) {
 	);
 }
 
+function ChevronIcon({ up }: { up: boolean }) {
+	return (
+		<svg
+			className='h-4 w-4'
+			viewBox='0 0 24 24'
+			fill='none'
+			stroke='currentColor'
+			strokeWidth='2'
+			strokeLinecap='round'
+			strokeLinejoin='round'
+			aria-hidden='true'
+		>
+			<path d={up ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} />
+		</svg>
+	);
+}
+
 /** Chat-style waiting indicator, on the side the next message will land. */
 function Listening() {
 	return (
@@ -109,6 +126,7 @@ export function VoicePanel({
 	unsupportedNote,
 	open,
 	onDismiss,
+	summary,
 }: {
 	title: string;
 	hint: string;
@@ -122,13 +140,19 @@ export function VoicePanel({
 	/** Whether the conversation bar is showing; the form pads itself to match. */
 	open: boolean;
 	onDismiss: () => void;
+	/** What has been captured so far — the same words the read-back speaks. */
+	summary?: string | null;
 }) {
+	// Whether the conversation fills the screen. Purely how the bar is displayed,
+	// so it stays here rather than being lifted with `open`.
+	const [expanded, setExpanded] = useState(false);
+
 	// Keep the newest turn in view, the way a chat thread does.
 	const logRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		const node = logRef.current;
 		if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
-	}, [log.length, running]);
+	}, [log.length, running, expanded]);
 
 	if (!supported) return <p className='text-xs text-subtle'>{unsupportedNote}</p>;
 
@@ -150,19 +174,30 @@ export function VoicePanel({
 			{open && (
 				<section
 					aria-label='Rozmowa'
-					className='fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface'
+					className={`fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface ${expanded ? 'top-0' : ''}`}
 				>
 					{/* Same max-width and gutters as the page, so the bar is full bleed
 					    but its contents line up with the form above it. */}
-					<div className='mx-auto flex w-full max-w-6xl flex-col px-4'>
+					<div className={`mx-auto flex w-full max-w-6xl flex-col px-4 ${expanded ? 'h-full' : ''}`}>
 						<header className='flex items-center justify-between gap-3 py-2.5'>
 							<div className='flex min-w-0 flex-col'>
 								<span className='flex items-center gap-2 text-sm font-semibold text-foreground'>
 									<MicIcon className='h-4 w-4 text-muted' />
 									{title}
 								</span>
-								<span className='truncate text-xs text-subtle'>{hint}</span>
+								{/* The captured answers when there are any, the vocabulary
+								    hint until then. */}
+								<span className={`truncate text-xs ${summary ? 'text-muted' : 'text-subtle'}`}>{summary || hint}</span>
 							</div>
+							<button
+								type='button'
+								onClick={() => setExpanded((current) => !current)}
+								aria-expanded={expanded}
+								className='flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 text-sm text-muted transition-colors hover:bg-surface-3 hover:text-foreground'
+							>
+								<ChevronIcon up={!expanded} />
+								<span className='sr-only'>{expanded ? 'Zwiń rozmowę' : 'Rozwiń rozmowę'}</span>
+							</button>
 							<button
 								type='button'
 								onClick={close}
@@ -175,7 +210,7 @@ export function VoicePanel({
 
 						<div
 							ref={logRef}
-							className='flex max-h-[40dvh] flex-col gap-2.5 overflow-y-auto border-t border-border/60 py-3'
+							className={`flex flex-col gap-2.5 overflow-y-auto border-t border-border/60 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
 						>
 							{log.map((turn, position) => (
 								<Bubble

@@ -81,7 +81,7 @@ export async function runFieldScript(
 	step: VoiceStep,
 	api: FieldScriptApi,
 ): Promise<StepOutcome> {
-	const { announce, askWith, guard, resetMisses } = runtime;
+	const { announce, askWith, guard, resetMisses, setStatus } = runtime;
 
 	const commit = (patch: FieldValues) => {
 		const merged = { ...api.getValues(), ...patch };
@@ -89,6 +89,8 @@ export async function runFieldScript(
 		for (const [name, value] of Object.entries(reconciled)) {
 			if (value !== api.getValues()[name]) api.setValue(name, value);
 		}
+		// Same words the read-back uses, so the screen and the voice agree.
+		setStatus({ summary: summarise(step, api.getValues()) });
 	};
 
 	/** One field, until it is settled or the beekeeper navigates away. */
@@ -148,6 +150,7 @@ export async function runFieldScript(
 				continue;
 			}
 
+			setStatus({ fieldName: field.name });
 			await announce(field.prompt);
 			const turn = await askField(field);
 
@@ -160,6 +163,8 @@ export async function runFieldScript(
 		}
 
 		// --- read back, then wait for an explicit decision --------------------
+		// No single field is in focus while confirming the step as a whole.
+		setStatus({ fieldName: null, summary: summarise(step, api.getValues()) });
 		await announce(`${summarise(step, api.getValues())}. Dalej?`);
 		for (;;) {
 			guard();

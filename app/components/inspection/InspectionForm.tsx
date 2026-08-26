@@ -2,7 +2,7 @@
 
 import { Steps, useSteps } from '@ark-ui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FormProvider, useForm, type FieldPath } from 'react-hook-form';
 
 import { fetchCurrentWeather, type InspectionWeather } from '../../lib/inspection-context';
@@ -104,6 +104,19 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	// The conversation bar is docked rather than overlaid, so the form reserves
 	// room for it instead of letting it cover the controls.
 	const voiceOpen = dialogue.running || (dialogue.log.length > 0 && !transcriptDismissed);
+
+	// Keep the screen on the field being asked. Imperative because scrolling is,
+	// and because a ring on one element is not worth threading through every
+	// field component as state.
+	const voiceField = dialogue.status.fieldName;
+	useEffect(() => {
+		document.querySelectorAll('[data-voice-active]').forEach((node) => node.removeAttribute('data-voice-active'));
+		if (!voiceField) return;
+		const target = document.querySelector(`[data-field="${voiceField}"]`);
+		if (!target) return;
+		target.setAttribute('data-voice-active', '');
+		target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}, [voiceField]);
 
 	const loadWeather = useCallback(async () => {
 		setWeatherState('loading');
@@ -227,6 +240,7 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 									log={dialogue.log}
 									error={dialogue.error}
 									open={voiceOpen}
+									summary={dialogue.status.summary}
 									onDismiss={() => setTranscriptDismissed(true)}
 									onStart={() => {
 										setTranscriptDismissed(false);

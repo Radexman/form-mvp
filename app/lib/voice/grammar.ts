@@ -94,8 +94,13 @@ const ORDINAL_TO_NUMBER: Record<string, number> = Object.fromEntries(
  * "pierzgi" fall out for free. Ordered longest-first where stems overlap.
  */
 const RESOURCE_STEMS: [string, FrameResource][] = [
+	// "miód" is /mjut/, so the recogniser writes it back phonetically as often as
+	// correctly — miut, mjut, miot. Each spelling gets a stem rather than relying
+	// on one, and "nektar" is kept as the reliable synonym to fall back on.
 	['miod', 'honey'],
-	['mio', 'honey'], // "miot", "mios" — common mishearings of miód
+	['mio', 'honey'], // miot, mios
+	['miu', 'honey'], // miut, miud
+	['mju', 'honey'], // mjut, mjud
 	['nektar', 'honey'],
 	['czerw', 'brood'],
 	['pierzg', 'pollen'],

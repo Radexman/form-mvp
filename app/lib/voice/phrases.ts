@@ -23,7 +23,7 @@ export const ASK_POLLEN = 'Pierzga?';
 
 export const NOT_UNDERSTOOD = 'Nie zrozumiałem. Powiedz na przykład: miód osiem, pierzga jeden.';
 /** Re-asked after a long silence — the question again, not a complaint. */
-export const CONFIRM_AGAIN = 'Dalej?';
+export const CONFIRM_AGAIN = 'Przejść do kolejnej ramki?';
 export const REPAIR_INTRO = 'Zapytam po kolei.';
 export const FINISHED = 'Gotowe. Wszystkie ramki zapisane.';
 export const STOPPED = 'Przerwane.';
@@ -40,12 +40,12 @@ export function overflowWarning(total: number): string {
 	return `To razem ${total * 10} procent, czyli więcej niż cała ramka. Powtórz proszę.`;
 }
 
-/** "Ramka trzecia: miód 80 procent, puste 20 procent, plaster dobry. Dalej?" */
+/** "Ramka trzecia: miód 80 procent, puste 20 procent, plaster dobry. Przejść do kolejnej ramki?" */
 export function readBack(frame: FrameValues, position: number): string {
 	const head = `Ramka ${ordinalPl(position)}`;
 
 	if (frame.comb_state === 'foundation') {
-		return `${head}: węza. Dalej?`;
+		return `${head}: węza. ${CONFIRM_AGAIN}`;
 	}
 
 	const parts: string[] = [];
@@ -58,5 +58,5 @@ export function readBack(frame: FrameValues, position: number): string {
 
 	if (frame.wear) parts.push(WEAR_SPEECH[frame.wear]);
 
-	return `${head}: ${parts.join(', ')}. Dalej?`;
+	return `${head}: ${parts.join(', ')}. ${CONFIRM_AGAIN}`;
 }

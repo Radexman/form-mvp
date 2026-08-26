@@ -60,6 +60,7 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api, runner
 				for (;;) {
 					runtime.guard();
 					const step = list[index];
+					runtime.setStatus({ stepKey: step.key, fieldName: null, summary: null });
 					const custom = depsRef.current.runners?.[step.key];
 					const script = VOICE_SCRIPTS[step.key];
 
@@ -114,6 +115,7 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api, runner
 		running: runtime.running,
 		log: runtime.log,
 		error: runtime.error,
+		status: runtime.status,
 		start,
 		stop: runtime.stop,
 	};

@@ -69,6 +69,12 @@ describe('parseCommand — resources', () => {
 		expect(parseCommand('osiem miodu')).toEqual(frame({ honey: 8 }));
 	});
 
+	// "miód" is /mjut/, and the recogniser writes it phonetically about as often
+	// as it spells it. "nektar" is the reliable fallback the beekeeper can use.
+	it.each([['miód'], ['miod'], ['miodu'], ['miot'], ['miut'], ['mjut'], ['nektar']])('reads "%s" as honey', (word) => {
+		expect(parseCommand(`${word} 8`)).toEqual(frame({ honey: 8 }));
+	});
+
 	it('accepts inflected forms via stems', () => {
 		expect(parseCommand('miodu 6 pierzgi 2 czerwiu 1')).toEqual(frame({ honey: 6, pollen: 2, brood: 1 }));
 	});

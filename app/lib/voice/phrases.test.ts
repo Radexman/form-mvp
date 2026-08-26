@@ -23,27 +23,29 @@ describe('announceFrame', () => {
 describe('readBack', () => {
 	it('reads the example frame, deriving the empty remainder', () => {
 		expect(readBack(frame(1, { honey: 8, pollen: 1 }), 1)).toBe(
-			'Ramka pierwsza: miód 80 procent, pierzga 10 procent, puste 10 procent, plaster dobry. Dalej?',
+			'Ramka pierwsza: miód 80 procent, pierzga 10 procent, puste 10 procent, plaster dobry. Przejść do kolejnej ramki?',
 		);
 	});
 
 	it('omits the remainder when the frame is full', () => {
 		expect(readBack(frame(3, { brood: 8, honey: 1, pollen: 1 }), 3)).toBe(
-			'Ramka trzecia: czerw 80 procent, miód 10 procent, pierzga 10 procent, plaster dobry. Dalej?',
+			'Ramka trzecia: czerw 80 procent, miód 10 procent, pierzga 10 procent, plaster dobry. Przejść do kolejnej ramki?',
 		);
 	});
 
 	it('says nothing but węza for foundation', () => {
-		expect(readBack(frame(8, { comb_state: 'foundation', wear: null }), 8)).toBe('Ramka ósma: węza. Dalej?');
+		expect(readBack(frame(8, { comb_state: 'foundation', wear: null }), 8)).toBe(
+			'Ramka ósma: węza. Przejść do kolejnej ramki?',
+		);
 	});
 
 	it('reads a drawn but empty frame as fully empty', () => {
-		expect(readBack(frame(2), 2)).toBe('Ramka druga: puste 100 procent, plaster dobry. Dalej?');
+		expect(readBack(frame(2), 2)).toBe('Ramka druga: puste 100 procent, plaster dobry. Przejść do kolejnej ramki?');
 	});
 
 	it('reports worn comb', () => {
 		expect(readBack(frame(7, { honey: 4, pollen: 2, wear: 'old' }), 7)).toBe(
-			'Ramka siódma: miód 40 procent, pierzga 20 procent, puste 40 procent, plaster stary. Dalej?',
+			'Ramka siódma: miód 40 procent, pierzga 20 procent, puste 40 procent, plaster stary. Przejść do kolejnej ramki?',
 		);
 	});
 });

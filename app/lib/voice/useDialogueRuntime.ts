@@ -38,6 +38,21 @@ export interface DialogueTurn {
 	text: string;
 }
 
+/**
+ * Where the dialogue currently is. Published by whichever script is running so
+ * the screen can follow the conversation: the bar shows the running summary,
+ * and the form scrolls the field being asked into view.
+ */
+export interface DialogueStatus {
+	stepKey: string | null;
+	/** Form field name currently being asked, when the step has discrete fields. */
+	fieldName: string | null;
+	/** What has been captured for this step so far, in the same words as the read-back. */
+	summary: string | null;
+}
+
+const IDLE_STATUS: DialogueStatus = { stepKey: null, fieldName: null, summary: null };
+
 export interface DialogueRuntime {
 	supported: boolean;
 	running: boolean;
@@ -59,6 +74,9 @@ export interface DialogueRuntime {
 	guard: () => void;
 	/** Clear the miss streak — for a script entering a simpler fallback. */
 	resetMisses: () => void;
+	status: DialogueStatus;
+	/** Scripts call this as they advance so the screen can follow along. */
+	setStatus: (patch: Partial<DialogueStatus>) => void;
 	/** Run a dialogue body, serialised against any previous run. */
 	run: (body: () => Promise<void>) => Promise<void>;
 	stop: () => void;
@@ -69,6 +87,7 @@ export function useDialogueRuntime(): DialogueRuntime {
 	const [running, setRunning] = useState(false);
 	const [log, setLog] = useState<DialogueTurn[]>([]);
 	const [error, setError] = useState<string | null>(null);
+	const [status, setStatusState] = useState<DialogueStatus>(IDLE_STATUS);
 
 	const runningRef = useRef(false);
 	const missStreakRef = useRef(0);
@@ -104,6 +123,10 @@ export function useDialogueRuntime(): DialogueRuntime {
 
 	const resetMisses = useCallback(() => {
 		missStreakRef.current = 0;
+	}, []);
+
+	const setStatus = useCallback((patch: Partial<DialogueStatus>) => {
+		setStatusState((current) => ({ ...current, ...patch }));
 	}, []);
 
 	const askWith = useCallback(
@@ -209,6 +232,8 @@ export function useDialogueRuntime(): DialogueRuntime {
 				} finally {
 					runningRef.current = false;
 					setRunning(false);
+					// The transcript stays for reading; the pointer into the form does not.
+					setStatusState((current) => ({ ...current, fieldName: null }));
 					io.cancel();
 				}
 			})();
@@ -235,6 +260,8 @@ export function useDialogueRuntime(): DialogueRuntime {
 		noteMiss,
 		guard,
 		resetMisses,
+		status,
+		setStatus,
 		run,
 		stop,
 	};

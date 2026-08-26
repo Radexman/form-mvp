@@ -37,6 +37,7 @@ function harness(script: string[]) {
 		},
 		guard: () => {},
 		resetMisses: () => {},
+		setStatus: () => {},
 	} as unknown as DialogueRuntime;
 
 	const api: FieldScriptApi = {

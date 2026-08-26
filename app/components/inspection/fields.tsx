@@ -36,6 +36,7 @@ export function TextField({ name, label, placeholder }: { name: FieldName; label
 
 	return (
 		<Field.Root
+			data-field={name}
 			invalid={!!error}
 			className='flex flex-col gap-1.5'
 		>
@@ -66,6 +67,7 @@ export function TextareaField({
 
 	return (
 		<Field.Root
+			data-field={name}
 			invalid={!!error}
 			className='flex flex-col gap-1.5'
 		>
@@ -105,6 +107,7 @@ export function NumberField({
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>
@@ -163,6 +166,7 @@ export function SelectField({
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>
@@ -318,6 +322,7 @@ export function RadioField({
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-2'
 				>
@@ -364,6 +369,7 @@ export function SwatchField({ name, label, options }: { name: FieldName; label: 
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-2'
 				>
@@ -405,6 +411,7 @@ export function CheckboxField({ name, label }: { name: FieldName; label: string 
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>
@@ -474,6 +481,7 @@ export function RatingField({ name, label, count = 5 }: { name: FieldName; label
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>
