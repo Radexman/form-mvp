@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 
+import { useCombDialogue, type DialoguePhase } from '../../../../lib/voice/useCombDialogue';
 import { NumberField } from '../../fields';
 import type { FormValues } from '../../schema';
 import { deriveComb, formatPl, frameFilled } from './comb.derive';
@@ -169,6 +170,15 @@ function TenthsRow({
  * or too washed (empty grey) to carry text on this background, so the accent is
  * kept to the rule and the dot.
  */
+const PHASE_HINT: Record<DialoguePhase, string> = {
+	idle: 'Powiedz np. „miód 8, pierzga 1”, a potem „dalej”. Możesz też mówić „węza”, „pusta”, „stary”, „wstecz”, „stop”.',
+	slots: 'Podaj liczbę miejsc w gnieździe…',
+	frame: 'Opisz ramkę…',
+	confirm: 'Powiedz „dalej”, albo popraw, np. „czerw 7”.',
+	repair: 'Pytam po kolei…',
+	done: 'Wszystkie ramki zapisane.',
+};
+
 function Stat({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent: string }) {
 	return (
 		<div
@@ -222,6 +232,15 @@ export function StepComb() {
 		if (!frame) return;
 		setFrames(frames.map((item, i) => (i === index ? { ...item, ...patch } : item)));
 	};
+
+	// Voice writes through these same setters — it is an input source for the
+	// form, not a second copy of the data.
+	const dialogue = useCombDialogue({
+		getFrames: () => (getValues('frames') ?? []) as FrameValues[],
+		setFrames,
+		setSlots: (value) => setValue('slots', value, { shouldDirty: true }),
+		setActive,
+	});
 
 	/** Slots is the box; the frame list follows it, growing and truncating from the end. */
 	const syncSlots = (next: number) => {
@@ -292,6 +311,55 @@ export function StepComb() {
 				Ramka po ramce, w dziesiątych częściach. Kilogramy miodu i zapasy policzy raport — tu wpisujesz tylko
 				to, co widzisz.
 			</p>
+
+			{/* The dialogue asks for slots itself, so it sits above that field. */}
+			{dialogue.supported ? (
+				<div className='flex flex-col gap-3 rounded-lg border border-border bg-surface-2/50 p-4'>
+					<div className='flex items-start justify-between gap-3'>
+						<div className='flex flex-col gap-0.5'>
+							<span className='text-sm font-semibold text-foreground'>Dyktowanie ramek</span>
+							<span className='text-xs text-subtle'>{PHASE_HINT[dialogue.phase]}</span>
+						</div>
+						{dialogue.running ? (
+							<button
+								type='button'
+								onClick={dialogue.stop}
+								className='min-h-14 shrink-0 rounded-lg border border-danger bg-danger/10 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/20'
+							>
+								■ Stop
+							</button>
+						) : (
+							<button
+								type='button'
+								onClick={() => void dialogue.start()}
+								className='min-h-14 shrink-0 rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent-dim hover:text-foreground'
+							>
+								🎙 Mów
+							</button>
+						)}
+					</div>
+
+					{dialogue.log.length > 0 && (
+						<div className='flex flex-col gap-1 rounded-md border border-border bg-surface p-3'>
+							{dialogue.log.map((turn, position) => (
+								<p
+									key={`${position}-${turn.text}`}
+									className={`text-xs ${turn.role === 'app' ? 'text-muted' : 'font-medium text-foreground'}`}
+								>
+									<span className='text-subtle'>{turn.role === 'app' ? '🔊 ' : '🎙 '}</span>
+									{turn.text}
+								</p>
+							))}
+						</div>
+					)}
+
+					{dialogue.error && <p className='text-sm text-danger'>{dialogue.error}</p>}
+				</div>
+			) : (
+				<p className='text-xs text-subtle'>
+					Dyktowanie ramek wymaga przeglądarki Chrome (Android). Tutaj wpisz ramki ręcznie.
+				</p>
+			)}
 
 			<div className='sm:max-w-xs'>
 				<NumberField
