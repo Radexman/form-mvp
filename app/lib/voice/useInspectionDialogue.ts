@@ -116,6 +116,7 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api, runner
 	return {
 		supported: runtime.supported,
 		running: runtime.running,
+		listening: runtime.listening,
 		log: runtime.log,
 		error: runtime.error,
 		status: runtime.status,

@@ -119,6 +119,7 @@ export function VoicePanel({
 	hint,
 	supported,
 	running,
+	listening,
 	log,
 	error,
 	onStart,
@@ -132,6 +133,8 @@ export function VoicePanel({
 	hint: string;
 	supported: boolean;
 	running: boolean;
+	/** Mic actually open, as opposed to the dialogue merely being under way. */
+	listening: boolean;
 	log: DialogueTurn[];
 	error: string | null;
 	onStart: () => void;
@@ -187,7 +190,7 @@ export function VoicePanel({
 				className='flex min-h-14 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-base font-semibold text-background transition-colors hover:bg-accent-dim hover:text-foreground disabled:opacity-40 sm:w-auto sm:self-start'
 			>
 				<MicIcon />
-				{running ? 'Słucham…' : title}
+				{listening ? 'Słucham…' : running ? 'Chwila…' : title}
 			</button>
 
 			{open && (
@@ -252,11 +255,14 @@ export function VoicePanel({
 									turn={turn}
 								/>
 							))}
-							{/* Waiting on the beekeeper, so it sits where their reply will. */}
+							{/* Waiting on the beekeeper, so it sits where their reply will.
+							    Between reopens the mic is shut and anything said is lost, so
+							    that stretch says so instead of pulsing as though it were
+							    hearing something. */}
 							{running && (
 								<div className='flex justify-end'>
 									<span className='rounded-2xl rounded-br-md bg-accent/15 px-4 py-2.5 ring-1 ring-accent/30'>
-										<Listening />
+										{listening ? <Listening /> : <span className='text-sm text-muted'>Chwila…</span>}
 									</span>
 								</div>
 							)}

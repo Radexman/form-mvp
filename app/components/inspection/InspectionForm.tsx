@@ -243,6 +243,7 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 									hint='Odpowiadaj na pytania, potwierdzaj słowem „dalej”. Po sekcji zapytam, czy przejść do kolejnej.'
 									supported={dialogue.supported}
 									running={dialogue.running}
+									listening={dialogue.listening}
 									log={dialogue.log}
 									error={dialogue.error}
 									open={voiceOpen}

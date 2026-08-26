@@ -10,22 +10,29 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
  * `listen` adds a short settle delay on top, because Android fires `onend`
  * marginally before the audio stops and the recogniser will otherwise transcribe
  * our own prompt.
+ *
+ * The second rule, learned the hard way: one `listen` is exactly one
+ * `recognition.start()`. Chrome on Android plays a start earcon that no page can
+ * silence (crbug 40324711), so a restart loop hidden in here becomes a ping every
+ * few seconds for as long as nobody speaks. Reopening is the caller's decision to
+ * pace, not ours to hide.
  */
 
 const LANG = 'pl-PL';
 /** Android reports utterance end just before the speaker goes quiet. */
 const ECHO_GUARD_MS = 250;
 /**
- * How long one listening window stays open. Long enough to put a frame back and
- * lift the next without the dialogue giving up on us.
+ * Safety net only. Android's recogniser ends a quiet session after a few seconds
+ * whatever `continuous` says, so in practice it is the engine that closes the
+ * window, not us; this exists so a session that somehow never reports `end`
+ * cannot hang the dialogue forever.
  *
- * Android does not honour this on its own: its recogniser abandons a session
- * after a few seconds of quiet whatever `continuous` says, so the window is held
- * open by restarting the session in place until the budget runs out.
+ * It is deliberately NOT a "keep listening this long" budget. Chrome on Android
+ * plays a start earcon on every `recognition.start()` and gives the page no way
+ * to silence it, so holding a long window open by restarting the session turns
+ * into a ping every few seconds — see the note above `listen`.
  */
-const LISTEN_WINDOW_MS = 25_000;
-/** Android throws if recognition is restarted the instant the previous session ends. */
-const RESTART_GAP_MS = 120;
+const LISTEN_CEILING_MS = 25_000;
 /** speechSynthesis occasionally drops onend entirely; never hang the dialogue on it. */
 const SPEAK_TIMEOUT_BASE_MS = 2000;
 const SPEAK_TIMEOUT_PER_CHAR_MS = 90;
@@ -64,10 +71,8 @@ export interface SpeechIO {
 export function useSpeechIO(): SpeechIO {
 	const recognitionRef = useRef<SpeechRecognition | null>(null);
 	const cancelledRef = useRef(false);
-	/** In-flight probe of whether pl-PL can run on-device. */
-	const localProbeRef = useRef<Promise<boolean> | null>(null);
-	/** Latched once the on-device pack is confirmed; from then on the probe is skipped. */
-	const localReadyRef = useRef(false);
+	/** Resolved once, lazily: whether pl-PL can run on-device. */
+	const localPreferenceRef = useRef<Promise<boolean> | null>(null);
 
 	const supported = useMemo(() => isSpeechSupported(), []);
 
@@ -92,18 +97,12 @@ export function useSpeechIO(): SpeechIO {
 	}, []);
 
 	/**
-	 * A "no" is never cached: the pack `prefersLocal` asked for may still be
-	 * downloading, and caching the first answer would keep the whole session on the
-	 * server recogniser — the one that ends every few seconds and beeps on restart.
+	 * Probed once and cached, answer either way. Re-probing each turn would only
+	 * add latency before the mic opens: Chrome on Android exposes `available()` but
+	 * ships no on-device models, so there it is a standing "unavailable" — the
+	 * on-device path is a desktop nicety, not the fix for anything on a phone.
 	 */
-	const resolveLocal = useCallback(async () => {
-		if (localReadyRef.current) return true;
-		localProbeRef.current ??= prefersLocal();
-		const ready = await localProbeRef.current;
-		if (ready) localReadyRef.current = true;
-		else localProbeRef.current = null;
-		return ready;
-	}, [prefersLocal]);
+	const resolveLocal = useCallback(() => (localPreferenceRef.current ??= prefersLocal()), [prefersLocal]);
 
 	const speak = useCallback(
 		(text: string) =>
@@ -148,8 +147,8 @@ export function useSpeechIO(): SpeechIO {
 			recognition.lang = LANG;
 			// Asks the engine to hold the session open across the pauses while a frame
 			// is set down and the next one lifted. Chrome's on-device recogniser obeys
-			// this; the server-side one on Android does not, which is why `reopen`
-			// below exists.
+			// this; the server-side one on Android ignores it and ends on quiet anyway,
+			// which is why the caller paces the reopens instead of us looping here.
 			recognition.continuous = true;
 			recognition.interimResults = false;
 			// Several readings of the same audio; the parser tries each in turn.
@@ -163,10 +162,7 @@ export function useSpeechIO(): SpeechIO {
 			}
 			recognitionRef.current = recognition;
 
-			const deadline = Date.now() + LISTEN_WINDOW_MS;
 			let settled = false;
-			/** Set between an early `end` and the `start` that answers it. */
-			let restarting = false;
 
 			const settle = (run: () => void) => {
 				if (settled) return;
@@ -181,43 +177,7 @@ export function useSpeechIO(): SpeechIO {
 				run();
 			};
 
-			// Bounds the window ourselves, since the engine's own silence timeout is
-			// what we are trying to avoid leaning on.
-			const window_ = setTimeout(() => settle(() => reject(new ListenError('no-speech'))), LISTEN_WINDOW_MS);
-
-			/**
-			 * The engine gave up on the quiet before we meant to. Reopen the same
-			 * session rather than rejecting: unwinding to the caller costs a spoken
-			 * re-prompt and counts against the miss streak, when all that happened is
-			 * that the beekeeper was still lifting a frame.
-			 */
-			const reopen = () => {
-				if (settled) return;
-				if (cancelledRef.current) {
-					settle(() => reject(new ListenError('aborted')));
-					return;
-				}
-				if (Date.now() >= deadline) {
-					settle(() => reject(new ListenError('no-speech')));
-					return;
-				}
-				restarting = true;
-				setTimeout(() => {
-					restarting = false;
-					if (settled) return;
-					// Stopped inside the gap: there is no live session for cancel() to
-					// abort, so unwind here or the caller waits out the whole window.
-					if (cancelledRef.current) {
-						settle(() => reject(new ListenError('aborted')));
-						return;
-					}
-					try {
-						recognition.start();
-					} catch {
-						settle(() => reject(new ListenError('other')));
-					}
-				}, RESTART_GAP_MS);
-			};
+			const window_ = setTimeout(() => settle(() => reject(new ListenError('no-speech'))), LISTEN_CEILING_MS);
 
 			recognition.onresult = (event) => {
 				// Continuous sessions accumulate results; take the newest one.
@@ -227,22 +187,18 @@ export function useSpeechIO(): SpeechIO {
 				settle(() => resolve(alternatives));
 			};
 			recognition.onerror = (event) => {
-				// Silence is not a failure here — it is the engine's own timeout, and
-				// the `end` that follows it reopens the window.
-				if (event.error === 'no-speech') return;
 				const reason: ListenFailure =
-					event.error === 'not-allowed' || event.error === 'network'
+					event.error === 'no-speech' || event.error === 'not-allowed' || event.error === 'network'
 						? event.error
 						: event.error === 'aborted'
 							? 'aborted'
 							: 'other';
 				settle(() => reject(new ListenError(reason)));
 			};
-			// Chrome ends the session silently when it heard nothing usable.
-			recognition.onend = () => {
-				if (restarting) return;
-				reopen();
-			};
+			// Chrome ends the session silently when it heard nothing usable. Reporting
+			// that up rather than restarting here is the point: the caller decides when
+			// the mic opens again, and every reopen costs an audible ping.
+			recognition.onend = () => settle(() => reject(new ListenError('no-speech')));
 
 			try {
 				recognition.start();

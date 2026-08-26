@@ -23,12 +23,23 @@ export const MAX_MISS_STREAK = 4;
 /** Retries at a single prompt before a script falls back to something simpler. */
 export const MAX_RETRIES = 2;
 /**
- * How many further listening windows to open, quietly, before the dialogue says
- * anything. Each window is long (see LISTEN_WINDOW_MS), so one retry already
- * gives the best part of a minute of silence — and each restart is an audible
- * earcon on Android, which is exactly what we are trying not to do.
+ * How many further times the mic reopens, without the dialogue saying anything,
+ * before it gives up on the turn.
+ *
+ * Chrome on Android plays a start earcon on every `recognition.start()` and the
+ * page cannot silence it, so the count of reopens *is* the count of pings the
+ * beekeeper hears. Keep it small.
  */
-export const SILENT_RETRIES = 1;
+export const QUIET_REOPENS = 2;
+/**
+ * How long the mic stays shut between those reopens.
+ *
+ * The engine abandons a quiet session after a few seconds, so without a gap here
+ * the reopens land back-to-back and the earcon becomes the every-few-seconds ping
+ * we are trying to be rid of. The cost is a stretch where nothing is heard — the
+ * panel says so, rather than showing a listening indicator that is not true.
+ */
+export const QUIET_GAP_MS = 12_000;
 /** Transcript length kept for scrolling back through. */
 export const MAX_LOG_TURNS = 200;
 
@@ -62,9 +73,17 @@ const IDLE_STATUS: DialogueStatus = { stepKey: null, fieldName: null, summary: n
  */
 export const sentenceCase = (text: string) => text.replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase('pl-PL'));
 
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export interface DialogueRuntime {
 	supported: boolean;
 	running: boolean;
+	/**
+	 * Whether the mic is open right now, as opposed to the dialogue merely being
+	 * under way. The two differ during the quiet gaps between reopens, and the
+	 * panel has to show the difference — anything said into a shut mic is lost.
+	 */
+	listening: boolean;
 	log: DialogueTurn[];
 	error: string | null;
 	setError: (message: string | null) => void;
@@ -94,6 +113,7 @@ export interface DialogueRuntime {
 export function useDialogueRuntime(): DialogueRuntime {
 	const io = useSpeechIO();
 	const [running, setRunning] = useState(false);
+	const [listening, setListening] = useState(false);
 	const [log, setLog] = useState<DialogueTurn[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const [status, setStatusState] = useState<DialogueStatus>(IDLE_STATUS);
@@ -145,11 +165,13 @@ export function useDialogueRuntime(): DialogueRuntime {
 			guard();
 
 			let alternatives: string[] = [];
-			// Silence is not misrecognition. The recogniser gives up on quiet after
-			// a few seconds, which is far less time than putting one frame down and
-			// lifting the next — so just start listening again, saying nothing.
+			// Silence is not misrecognition. The recogniser gives up on quiet after a
+			// few seconds, which is far less time than putting one frame down and
+			// lifting the next — so open the mic again, saying nothing. The waiting
+			// happens with the mic shut, because reopening it is what pings.
 			for (let quiet = 0; ; quiet += 1) {
 				try {
+					setListening(true);
 					alternatives = await io.listen();
 					break;
 				} catch (failure) {
@@ -158,11 +180,16 @@ export function useDialogueRuntime(): DialogueRuntime {
 						setError('Brak dostępu do mikrofonu. Zezwól na mikrofon albo wpisz dane ręcznie.');
 						throw new Aborted();
 					}
-					if (failure instanceof ListenError && failure.reason === 'no-speech' && quiet < SILENT_RETRIES) {
+					if (failure instanceof ListenError && failure.reason === 'no-speech' && quiet < QUIET_REOPENS) {
+						setListening(false);
+						await pause(QUIET_GAP_MS);
+						guard();
 						continue;
 					}
 					// Long enough to be worth a nudge, or a failure that is not silence.
 					return noteMiss();
+				} finally {
+					setListening(false);
 				}
 			}
 			guard();
@@ -188,6 +215,7 @@ export function useDialogueRuntime(): DialogueRuntime {
 		const wasRunning = runningRef.current;
 		runningRef.current = false;
 		setRunning(false);
+		setListening(false);
 		io.cancel();
 		// Audible acknowledgement — with the phone pocketed there is nothing to
 		// see. Only when something was actually interrupted.
@@ -243,6 +271,7 @@ export function useDialogueRuntime(): DialogueRuntime {
 				} finally {
 					runningRef.current = false;
 					setRunning(false);
+					setListening(false);
 					// The transcript stays for reading; the pointer into the form does not.
 					setStatusState((current) => ({ ...current, fieldName: null }));
 					io.cancel();
@@ -262,6 +291,7 @@ export function useDialogueRuntime(): DialogueRuntime {
 	return {
 		supported: io.supported,
 		running,
+		listening,
 		log,
 		error,
 		setError,
