@@ -69,14 +69,13 @@ describe('queen script — the ordinary case', () => {
 		});
 	});
 
-	it('asks the fields in order, opening with the step name', async () => {
+	it('opens straight on the first question, with no separate announcement', async () => {
 		const { spoken } = await run(['widziana', 'nie', 'brak', 'dalej']);
-		expect(spoken[0]).toBe('Matka.');
-		expect(spoken[1]).toBe('Matka?');
-		expect(spoken[2]).toBe('Znakowana?');
+		expect(spoken[0]).toBe('Matka?');
+		expect(spoken[1]).toBe('Znakowana?');
 		// Colour is skipped for an unmarked queen.
 		expect(spoken).not.toContain('Kolor znaczka?');
-		expect(spoken[3]).toBe('Mateczniki?');
+		expect(spoken[2]).toBe('Mateczniki?');
 	});
 });
 
@@ -137,8 +136,8 @@ describe('queen script — confirming does not double as an answer', () => {
 
 	it('treats "nie" as a correction, not as unmarking', async () => {
 		const { spoken } = await run(['widziana', 'nie', 'brak', 'nie', 'widziana', 'nie', 'brak', 'dalej']);
-		// The step was restarted, so its opening line was spoken twice.
-		expect(spoken.filter((line) => line === 'Matka.')).toHaveLength(2);
+		// The step was restarted, so its first question was asked twice.
+		expect(spoken.filter((line) => line === 'Matka?')).toHaveLength(2);
 	});
 
 	it('still amends a boolean by its own wording', async () => {

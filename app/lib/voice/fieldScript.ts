@@ -33,8 +33,12 @@ export type VoiceField =
 
 export interface VoiceStep {
 	key: string;
-	/** Spoken when the step opens, e.g. "Matka." */
-	intro: string;
+	/**
+	 * Optional line before the first question. Most steps skip it — the first
+	 * prompt already names the subject, so announcing it first is one spoken
+	 * turn of nothing.
+	 */
+	intro?: string;
 	fields: VoiceField[];
 	/**
 	 * Keep dependent fields consistent after every answer — the spoken
@@ -132,7 +136,7 @@ export async function runFieldScript(
 	};
 
 	restart: for (;;) {
-		await announce(step.intro);
+		if (step.intro) await announce(step.intro);
 
 		let index = 0;
 		while (index < step.fields.length) {

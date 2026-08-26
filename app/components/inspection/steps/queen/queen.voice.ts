@@ -63,7 +63,6 @@ export function reconcileQueen(values: FieldValues): FieldValues {
 
 export const queenVoiceStep: VoiceStep = {
 	key: 'queen',
-	intro: 'Matka.',
 	fields: [
 		{
 			kind: 'choice',
