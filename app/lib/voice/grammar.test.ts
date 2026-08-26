@@ -75,6 +75,12 @@ describe('parseCommand — resources', () => {
 		expect(parseCommand(`${word} 8`)).toEqual(frame({ honey: 8 }));
 	});
 
+	// "pyłek" is /pɨwek/; the recogniser writes that y back as i or u as readily
+	// as it spells it, so every opening has to reach pollen.
+	it.each([['pierzga'], ['pierzgi'], ['pyłek'], ['pyłku'], ['piłek'], ['pułek']])('reads "%s" as pollen', (word) => {
+		expect(parseCommand(`${word} 3`)).toEqual(frame({ pollen: 3 }));
+	});
+
 	it('accepts inflected forms via stems', () => {
 		expect(parseCommand('miodu 6 pierzgi 2 czerwiu 1')).toEqual(frame({ honey: 6, pollen: 2, brood: 1 }));
 	});
@@ -123,6 +129,19 @@ describe('parseCommand — navigation', () => {
 
 	it('ignores a trailing confirmation when content was dictated', () => {
 		expect(parseCommand('miód 8 dobrze')).toEqual(frame({ honey: 8 }));
+	});
+
+	// The prompts are "Przejść do kolejnej ramki?" and "...sekcji?", so echoing
+	// the question back is the obvious answer.
+	it.each([['kolejna ramka'], ['kolejna sekcja'], ['następna'], ['dalej'], ['tak']])(
+		'accepts "%s" as confirmation',
+		(phrase) => {
+			expect(parseCommand(phrase)).toEqual({ kind: 'next' });
+		},
+	);
+
+	it('still jumps when a frame is named by position', () => {
+		expect(parseCommand('ramka druga')).toEqual({ kind: 'goto', position: 2 });
 	});
 
 	it('handles the remaining control words', () => {

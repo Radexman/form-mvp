@@ -104,8 +104,12 @@ const RESOURCE_STEMS: [string, FrameResource][] = [
 	['nektar', 'honey'],
 	['czerw', 'brood'],
 	['pierzg', 'pollen'],
-	['pylk', 'pollen'],
+	// "pyłek" is /pɨwek/, and Polish y is written back as i or u about as often
+	// as itself — piłek, pułek. The stem is the p + vowel + l opening, which is
+	// what survives every spelling of it.
 	['pyl', 'pollen'],
+	['pil', 'pollen'],
+	['pul', 'pollen'],
 ];
 
 const WEAR_STEMS: [string, CombCondition][] = [
@@ -123,7 +127,23 @@ const EMPTY_STEMS = ['pust']; // pusta, puste, pusty
  * anyway, so losing them as a way to *set* good costs nothing, while losing them
  * as a way to say yes would strand the confirm prompt.
  */
-const NEXT_WORDS = ['dalej', 'nastepna', 'nastepny', 'zapisz', 'tak', 'ok', 'okej', 'gotowe', 'dobrze', 'dobra'];
+const NEXT_WORDS = [
+	'dalej',
+	'nastepna',
+	'nastepny',
+	// Echoing the question back — "kolejna ramka", "kolejna sekcja" — is a
+	// natural way to answer it, and neither noun needs matching for that to work.
+	'kolejna',
+	'kolejny',
+	'kolejne',
+	'zapisz',
+	'tak',
+	'ok',
+	'okej',
+	'gotowe',
+	'dobrze',
+	'dobra',
+];
 const BACK_WORDS = ['wstecz', 'poprzednia', 'poprzedni'];
 const UNDO_WORDS = ['cofnij', 'popraw', 'poprawka', 'zle', 'nie'];
 const REPEAT_WORDS = ['powtorz', 'powtorka'];
