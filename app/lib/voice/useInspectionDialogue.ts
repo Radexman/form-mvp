@@ -49,13 +49,16 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api, runner
 	const start = useCallback(
 		() =>
 			runtime.run(async () => {
-				const { steps: list, startIndex: from, goToStep: go } = depsRef.current;
+				const list = depsRef.current.steps;
 				const scriptApi: FieldScriptApi = {
 					getValues: () => depsRef.current.api.getValues(),
 					setValue: (name, value) => depsRef.current.api.setValue(name, value),
 				};
+				// Through the ref on every call: the walk outlives the render it
+				// started in, and a captured navigator would move a stale stepper.
+				const go = (target: number) => depsRef.current.goToStep(target);
 
-				let index = Math.min(Math.max(from(), 0), list.length - 1);
+				let index = Math.min(Math.max(depsRef.current.startIndex(), 0), list.length - 1);
 
 				for (;;) {
 					runtime.guard();
