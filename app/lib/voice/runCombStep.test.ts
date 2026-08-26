@@ -102,7 +102,7 @@ describe('the happy path', () => {
 
 	it('asks for slots first, then announces frames by ordinal', async () => {
 		await run(['jeden', 'pusta', 'dalej']);
-		expect(spoken[0]).toBe('Miejsca w gnieździe?');
+		expect(spoken[0]).toBe('Ile jest ramek w ulu?');
 		expect(said('Ramka pierwsza')).toBe(true);
 	});
 

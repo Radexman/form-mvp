@@ -15,6 +15,12 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 const LANG = 'pl-PL';
 /** Android reports utterance end just before the speaker goes quiet. */
 const ECHO_GUARD_MS = 250;
+/**
+ * How long one listening window stays open. Long enough to put a frame back and
+ * lift the next without the session ending, so the recogniser is not restarted —
+ * and therefore does not sound its start earcon — while the beekeeper works.
+ */
+const LISTEN_WINDOW_MS = 25_000;
 /** speechSynthesis occasionally drops onend entirely; never hang the dialogue on it. */
 const SPEAK_TIMEOUT_BASE_MS = 2000;
 const SPEAK_TIMEOUT_PER_CHAR_MS = 90;
@@ -120,7 +126,11 @@ export function useSpeechIO(): SpeechIO {
 		return new Promise<string[]>((resolve, reject) => {
 			const recognition = new Ctor();
 			recognition.lang = LANG;
-			recognition.continuous = false;
+			// One long listening window rather than a string of short ones. Starting
+			// recognition plays an earcon on Android, so every restart is an audible
+			// ping; continuous mode holds the session open across the pauses while a
+			// frame is set down and the next one lifted.
+			recognition.continuous = true;
 			recognition.interimResults = false;
 			// Several readings of the same audio; the parser tries each in turn.
 			recognition.maxAlternatives = 5;
@@ -137,12 +147,24 @@ export function useSpeechIO(): SpeechIO {
 			const settle = (run: () => void) => {
 				if (settled) return;
 				settled = true;
+				clearTimeout(window_);
 				recognitionRef.current = null;
+				try {
+					recognition.stop();
+				} catch {
+					// Already stopped; nothing to unwind.
+				}
 				run();
 			};
 
+			// Bounds the window ourselves, since the engine's own silence timeout is
+			// what we are trying to avoid leaning on.
+			const window_ = setTimeout(() => settle(() => reject(new ListenError('no-speech'))), LISTEN_WINDOW_MS);
+
 			recognition.onresult = (event) => {
-				const result = event.results[0];
+				// Continuous sessions accumulate results; take the newest one.
+				const result = event.results[event.resultIndex];
+				if (!result) return;
 				const alternatives = Array.from({ length: result.length }, (_, i) => result[i].transcript);
 				settle(() => resolve(alternatives));
 			};

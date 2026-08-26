@@ -83,7 +83,13 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	const dialogue = useInspectionDialogue({
 		steps: STEP_META,
 		startIndex: () => Math.min(steps.value, STEP_META.length - 1),
-		goToStep: (index) => steps.setStep(index),
+		goToStep: (index) => {
+			// Everything before the destination has been walked, so record it the
+			// way the Dalej button does — otherwise the stepper shows no progress
+			// and its triggers stay disabled after a spoken run.
+			for (let position = 0; position < index; position += 1) validatedSteps.current.add(position);
+			steps.setStep(index);
+		},
 		api: {
 			getValues: () => methods.getValues() as FieldValues,
 			setValue: (name, value) => methods.setValue(name as FieldPath<FormValues>, value as never, { shouldDirty: true }),

@@ -108,7 +108,15 @@ describe('the hand-off between steps', () => {
 		expect(spoken).toContain('Zapisane. Przejść do kolejnej sekcji?');
 	});
 
-	it.each([['tak'], ['dalej'], ['przejdź dalej']])('advances on "%s"', async (word) => {
+	it.each([
+		['tak'],
+		['dalej'],
+		['przejdź dalej'],
+		['przejdź do kolejnej sekcji'],
+		['kolejna sekcja'],
+		['kolejna'],
+		['następna'],
+	])('advances on "%s"', async (word) => {
 		const { visited } = await walk([...QUEEN_ANSWERS, word]);
 		// queen -> brood, which has no script yet and ends the walk.
 		expect(visited).toEqual([1, 2]);

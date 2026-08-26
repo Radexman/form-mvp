@@ -100,12 +100,12 @@ function Listening() {
 function Bubble({ turn }: { turn: DialogueTurn }) {
 	const mine = turn.role === 'you';
 	return (
-		<div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+		<div className={`flex ${mine ? 'justify-end pl-8' : 'justify-start pr-8'}`}>
 			<p
-				className={`max-w-[85%] px-4 py-2.5 text-base leading-snug text-foreground ${
+				className={`w-fit max-w-full rounded-2xl px-4 py-2.5 text-base leading-relaxed shadow-md ${
 					mine
-						? 'rounded-2xl rounded-br-md bg-accent/15 ring-1 ring-accent/30'
-						: 'rounded-2xl rounded-bl-md bg-surface-3'
+						? 'rounded-br-sm bg-accent/20 text-foreground ring-1 ring-accent/40'
+						: 'rounded-bl-sm bg-surface-3 text-foreground ring-1 ring-border'
 				}`}
 			>
 				{turn.text}
@@ -160,13 +160,17 @@ export function VoicePanel({
 
 	// Keep the newest turn in view, the way a chat thread does.
 	const logRef = useRef<HTMLDivElement>(null);
+	/**
+	 * Whether to follow new turns. Recorded while the beekeeper scrolls rather
+	 * than measured when a turn arrives: by then the new bubble is already in the
+	 * DOM, and a tall read-back would look like deliberate scrolling away and
+	 * cancel its own scroll.
+	 */
+	const followRef = useRef(true);
+
 	useEffect(() => {
 		const node = logRef.current;
-		if (!node) return;
-		// Only follow along when already near the bottom, so scrolling back
-		// through the conversation is not yanked forward by the next turn.
-		const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 120;
-		if (nearBottom) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+		if (node && followRef.current) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
 	}, [log.length, running, expanded]);
 
 	if (!supported) return <p className='text-xs text-subtle'>{unsupportedNote}</p>;
@@ -225,6 +229,10 @@ export function VoicePanel({
 
 						<div
 							ref={logRef}
+							onScroll={(event) => {
+								const node = event.currentTarget;
+								followRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
+							}}
 							className={`flex flex-col gap-2.5 overflow-y-auto overscroll-contain border-t border-border/60 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
 						>
 							{log.map((turn, position) => (

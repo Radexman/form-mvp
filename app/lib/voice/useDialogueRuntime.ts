@@ -23,12 +23,12 @@ export const MAX_MISS_STREAK = 4;
 /** Retries at a single prompt before a script falls back to something simpler. */
 export const MAX_RETRIES = 2;
 /**
- * How many times the recogniser may time out on silence before the dialogue
- * says anything. Chrome gives up after roughly five seconds of quiet, which is
- * nowhere near long enough to set one frame down and lift the next, so waiting
- * quietly through several of those is the normal case rather than a problem.
+ * How many further listening windows to open, quietly, before the dialogue says
+ * anything. Each window is long (see LISTEN_WINDOW_MS), so one retry already
+ * gives the best part of a minute of silence — and each restart is an audible
+ * earcon on Android, which is exactly what we are trying not to do.
  */
-export const SILENT_RETRIES = 5;
+export const SILENT_RETRIES = 1;
 /** Transcript length kept for scrolling back through. */
 export const MAX_LOG_TURNS = 200;
 

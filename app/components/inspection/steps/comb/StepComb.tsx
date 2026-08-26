@@ -288,7 +288,7 @@ export function StepComb() {
 			<div className='sm:max-w-xs'>
 				<NumberField
 					name='slots'
-					label='Miejsc w ulu (gniazdo)'
+					label='Ramki w ulu'
 					min={1}
 					max={MAX_SLOTS}
 					onValueChange={syncSlots}
@@ -299,7 +299,7 @@ export function StepComb() {
 			<div className='flex flex-col gap-2'>
 				<div className='flex items-center justify-between'>
 					<span className='text-sm text-muted'>
-						Ramki: {frames.length} z {slots} miejsc
+						Ramki: {frames.length} z {slots}
 					</span>
 					<div className='flex gap-2'>
 						<button

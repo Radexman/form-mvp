@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalize, ordinalPl, parseCommand, parseNumberToken } from './grammar';
+import { normalize, ordinalPl, parseCommand, parseControl, parseNumberToken } from './grammar';
 
 const frame = (values: Record<string, number>, extra: Record<string, unknown> = {}) => ({
 	kind: 'frame',
@@ -75,6 +75,12 @@ describe('parseCommand — resources', () => {
 		expect(parseCommand(`${word} 8`)).toEqual(frame({ honey: 8 }));
 	});
 
+	// "pyłek" is /pɨwek/; the recogniser writes that y back as i or u as readily
+	// as it spells it, so every opening has to reach pollen.
+	it.each([['pierzga'], ['pierzgi'], ['pyłek'], ['pyłku'], ['piłek'], ['pułek']])('reads "%s" as pollen', (word) => {
+		expect(parseCommand(`${word} 3`)).toEqual(frame({ pollen: 3 }));
+	});
+
 	it('accepts inflected forms via stems', () => {
 		expect(parseCommand('miodu 6 pierzgi 2 czerwiu 1')).toEqual(frame({ honey: 6, pollen: 2, brood: 1 }));
 	});
@@ -123,6 +129,32 @@ describe('parseCommand — navigation', () => {
 
 	it('ignores a trailing confirmation when content was dictated', () => {
 		expect(parseCommand('miód 8 dobrze')).toEqual(frame({ honey: 8 }));
+	});
+
+	// The prompts are "Przejść do kolejnej ramki?" and "...sekcji?", so echoing
+	// the question back is the obvious answer.
+	it.each([
+		['kolejna ramka'],
+		['kolejna sekcja'],
+		['kolejna'],
+		['przejdź do kolejnej sekcji'],
+		['przejść do kolejnej ramki'],
+		['następna'],
+		['dalej'],
+		['tak'],
+	])('accepts "%s" as confirmation', (phrase) => {
+		expect(parseCommand(phrase)).toEqual({ kind: 'next' });
+	});
+
+	// "przejdź" counts as going on, so a phrasing that pairs it with a direction
+	// must not be read as the opposite of what was said.
+	it('reads "przejdź wstecz" as going back', () => {
+		expect(parseControl('przejdź wstecz')).toEqual({ kind: 'back' });
+		expect(parseControl('wstecz')).toEqual({ kind: 'back' });
+	});
+
+	it('still jumps when a frame is named by position', () => {
+		expect(parseCommand('ramka druga')).toEqual({ kind: 'goto', position: 2 });
 	});
 
 	it('handles the remaining control words', () => {
