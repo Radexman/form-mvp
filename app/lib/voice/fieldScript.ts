@@ -1,4 +1,4 @@
-import { matchBoolean, matchChoice, matchNumber, type Choice } from './choice';
+import { matchBoolean, matchChoice, matchMulti, matchNumber, type Choice, type MultiPhrases } from './choice';
 import { parseControl, type ControlCommand } from './grammar';
 import { Aborted, MAX_RETRIES, type DialogueRuntime } from './useDialogueRuntime';
 
@@ -28,8 +28,11 @@ interface FieldBase {
 
 export type VoiceField =
 	| (FieldBase & { kind: 'choice'; choices: Choice[] })
+	/** Several of the same choices at once; an empty list is a real answer. */
+	| (FieldBase & { kind: 'multi'; choices: Choice[]; phrases?: MultiPhrases })
 	| (FieldBase & { kind: 'boolean'; yes?: string[]; no?: string[] })
-	| (FieldBase & { kind: 'number'; min: number; max: number });
+	/** `synonyms` lets a value be described rather than counted — see matchNumber. */
+	| (FieldBase & { kind: 'number'; min: number; max: number; synonyms?: Record<number, string[]> });
 
 export interface VoiceStep {
 	key: string;
@@ -59,10 +62,12 @@ function matchField(field: VoiceField, transcript: string): unknown | null {
 	switch (field.kind) {
 		case 'choice':
 			return matchChoice(transcript, field.choices);
+		case 'multi':
+			return matchMulti(transcript, field.choices, field.phrases);
 		case 'boolean':
 			return matchBoolean(transcript, field.yes, field.no);
 		case 'number':
-			return matchNumber(transcript, field.min, field.max);
+			return matchNumber(transcript, field.min, field.max, field.synonyms);
 	}
 }
 
@@ -165,14 +170,14 @@ export async function runFieldScript(
 		// --- read back, then wait for an explicit decision --------------------
 		// No single field is in focus while confirming the step as a whole.
 		setStatus({ fieldName: null, summary: summarise(step, api.getValues()) });
-		await announce(`${summarise(step, api.getValues())}. Dalej?`);
+		await announce(`${summarise(step, api.getValues())}. Czy przejść dalej?`);
 		for (;;) {
 			guard();
 
 			const answer = await askWith<Answer | ControlCommand>((transcript) => {
 				// Control words win here, the reverse of a field prompt: after a
-				// read-back "tak" and "nie" are answers to "Dalej?", not values for
-				// whichever boolean field happens to be listed first.
+				// read-back "tak" and "nie" answer "Czy przejść dalej?", they are not
+				// values for whichever boolean field happens to be listed first.
 				const control = parseControl(transcript);
 				if (control) return control;
 
@@ -189,12 +194,12 @@ export async function runFieldScript(
 			if (answer === null) {
 				// Nothing heard for a long while — ask the short question again
 				// rather than reciting the whole step.
-				await announce('Dalej?');
+				await announce('Czy przejść dalej?');
 				continue;
 			}
 			if ('field' in answer) {
 				commit({ [answer.field.name]: answer.value });
-				await announce(`${summarise(step, api.getValues())}. Dalej?`);
+				await announce(`${summarise(step, api.getValues())}. Czy przejść dalej?`);
 				continue;
 			}
 			switch (answer.kind) {
@@ -208,7 +213,7 @@ export async function runFieldScript(
 					resetMisses();
 					continue restart;
 				case 'repeat':
-					await announce(`${summarise(step, api.getValues())}. Dalej?`);
+					await announce(`${summarise(step, api.getValues())}. Czy przejść dalej?`);
 					continue;
 			}
 		}

@@ -1,3 +1,4 @@
+import { broodVoiceStep } from '../../components/inspection/steps/brood/brood.voice';
 import { queenVoiceStep } from '../../components/inspection/steps/queen/queen.voice';
 import type { VoiceStep } from './fieldScript';
 
@@ -11,4 +12,5 @@ import type { VoiceStep } from './fieldScript';
  */
 export const VOICE_SCRIPTS: Partial<Record<string, VoiceStep>> = {
 	queen: queenVoiceStep,
+	brood: broodVoiceStep,
 };

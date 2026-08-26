@@ -175,7 +175,7 @@ describe('the last frame', () => {
 		// Read-backs only; the bare announcements share the same prefix.
 		const readBacks = spoken.filter((line) => line.startsWith('Ramka') && line.includes(':'));
 		expect(readBacks[0]).toContain('Przejść do kolejnej ramki?');
-		expect(readBacks[1]).toContain('Dalej?');
+		expect(readBacks[1]).toContain('Czy przejść dalej?');
 		expect(readBacks[1]).not.toContain('kolejnej ramki');
 	});
 
@@ -193,7 +193,7 @@ describe('silence', () => {
 		const readBacks = spoken.filter((line) => line.startsWith('Ramka pierwsza:'));
 		expect(readBacks).toHaveLength(1);
 		// One frame in the box, so the closing question is the plain one.
-		expect(spoken.filter((line) => line === 'Dalej?').length).toBeGreaterThan(0);
+		expect(spoken.filter((line) => line === 'Czy przejść dalej?').length).toBeGreaterThan(0);
 	});
 });
 

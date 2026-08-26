@@ -166,8 +166,8 @@ export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): P
 			for (;;) {
 				guard();
 				// The one turn in the whole dialogue where the beekeeper is working
-				// rather than answering: the frame has to come out and be read before
-				// there is anything to say.
+				// rather than answering, so the mic is given more reopens before the
+				// turn is written off — the frame may still be coming out.
 				const command = await ask('work');
 
 				if (!command) {

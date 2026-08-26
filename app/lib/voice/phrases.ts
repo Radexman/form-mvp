@@ -25,7 +25,7 @@ export const NOT_UNDERSTOOD = 'Nie zrozumiałem. Powiedz na przykład: miód osi
 /** Asked after each frame's read-back, except the last — there is no next one. */
 export const CONFIRM_NEXT_FRAME = 'Przejść do kolejnej ramki?';
 /** The last frame in the box: the step, not another frame, is what follows. */
-export const CONFIRM_LAST_FRAME = 'Dalej?';
+export const CONFIRM_LAST_FRAME = 'Czy przejść dalej?';
 export const REPAIR_INTRO = 'Zapytam po kolei.';
 export const FINISHED = 'Gotowe. Wszystkie ramki zapisane.';
 export const STOPPED = 'Przerwane.';
