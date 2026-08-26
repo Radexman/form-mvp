@@ -126,6 +126,27 @@ describe('queen script — correcting at the read-back', () => {
 	});
 });
 
+describe('queen script — confirming does not double as an answer', () => {
+	// "tak" is the most natural confirmation, and it is also a yes for the
+	// znakowana boolean. At the read-back it must confirm, not unmark.
+	it('treats "tak" as confirmation, not as a value', async () => {
+		const { outcome, values } = await run(['widziana', 'nie', 'brak', 'tak']);
+		expect(outcome).toBe('done');
+		expect(values.queen_marked).toBe(false);
+	});
+
+	it('treats "nie" as a correction, not as unmarking', async () => {
+		const { spoken } = await run(['widziana', 'nie', 'brak', 'nie', 'widziana', 'nie', 'brak', 'dalej']);
+		// The step was restarted, so its opening line was spoken twice.
+		expect(spoken.filter((line) => line === 'Matka.')).toHaveLength(2);
+	});
+
+	it('still amends a boolean by its own wording', async () => {
+		const { values } = await run(['widziana', 'tak', 'czerwony', 'brak', 'nieznakowana', 'dalej']);
+		expect(values.queen_marked).toBe(false);
+	});
+});
+
 describe('queen script — navigation', () => {
 	it('reports back so the caller can move to the previous step', async () => {
 		const { outcome } = await run(['wstecz']);

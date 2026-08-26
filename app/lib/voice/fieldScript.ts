@@ -161,14 +161,20 @@ export async function runFieldScript(
 			await announce(`${summarise(step, api.getValues())}. Dalej?`);
 
 			const answer = await askWith<Answer | ControlCommand>((transcript) => {
-				// At the confirm prompt any field in the step can be amended by
-				// naming its value, e.g. "niebieski" after a mis-heard colour.
+				// Control words win here, the reverse of a field prompt: after a
+				// read-back "tak" and "nie" are answers to "Dalej?", not values for
+				// whichever boolean field happens to be listed first.
+				const control = parseControl(transcript);
+				if (control) return control;
+
+				// Otherwise any field in the step can be amended by naming its
+				// value, e.g. "niebieski" after a mis-heard colour.
 				for (const field of step.fields) {
 					if (!(field.when?.(api.getValues()) ?? true)) continue;
 					const value = matchField(field, transcript);
 					if (value !== null) return { field, value } satisfies Answer;
 				}
-				return parseControl(transcript);
+				return null;
 			});
 
 			if (answer === null) {
