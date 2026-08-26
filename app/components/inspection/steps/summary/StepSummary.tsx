@@ -250,7 +250,7 @@ export function StepSummary({
 				>
 					<Row
 						label='Ramki'
-						value={`${v.frames?.length ?? 0} z ${v.slots} miejsc`}
+						value={`${v.frames?.length ?? 0} z ${v.slots}`}
 					/>
 					<Row
 						label='Czerw'
