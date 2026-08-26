@@ -26,7 +26,20 @@ function filenameFromDisposition(header: string | null): string | undefined {
 	return match?.[1];
 }
 
-const STEP_COMPONENTS = [StepQueen, StepBrood, StepColony, StepComb, StepActions, StepNotes, StepHealth];
+/**
+ * Keyed by step, not indexed: schema.ts owns the order, and looking components
+ * up by key means reordering there cannot leave this list pointing at the wrong
+ * step.
+ */
+const STEP_COMPONENTS: Record<string, () => React.ReactElement> = {
+	comb: StepComb,
+	queen: StepQueen,
+	brood: StepBrood,
+	colony: StepColony,
+	health: StepHealth,
+	actions: StepActions,
+	notes: StepNotes,
+};
 
 const SUMMARY_META = { key: 'summary', title: 'Podsumowanie' };
 const ALL_STEPS = [...STEP_META, SUMMARY_META];
@@ -167,16 +180,19 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 						))}
 					</Steps.List>
 					<div className='flex min-w-0 flex-1 flex-col gap-8'>
-						{STEP_COMPONENTS.map((StepComponent, index) => (
-							<Steps.Content
-								key={STEP_META[index].key}
-								index={index}
-								className='rounded-lg border border-border bg-surface p-6'
-							>
-								<h2 className='mb-4 text-lg font-semibold text-foreground'>{STEP_META[index].title}</h2>
-								<StepComponent />
-							</Steps.Content>
-						))}
+						{STEP_META.map((meta, index) => {
+							const StepComponent = STEP_COMPONENTS[meta.key];
+							return (
+								<Steps.Content
+									key={meta.key}
+									index={index}
+									className='rounded-lg border border-border bg-surface p-6'
+								>
+									<h2 className='mb-4 text-lg font-semibold text-foreground'>{meta.title}</h2>
+									<StepComponent />
+								</Steps.Content>
+							);
+						})}
 						<Steps.Content
 							key={SUMMARY_META.key}
 							index={SUMMARY_INDEX}
