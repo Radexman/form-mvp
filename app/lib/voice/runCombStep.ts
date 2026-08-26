@@ -61,7 +61,7 @@ export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): P
 			if (command?.kind === 'number' && command.value >= 1 && command.value <= MAX_SLOTS) return command.value;
 			if (attempt < MAX_RETRIES) await announce(say.askSlotsAgain(MAX_SLOTS));
 		}
-		setError('Nie udało się ustalić liczby miejsc. Ustaw ją ręcznie.');
+		setError('Nie udało się ustalić liczby ramek. Ustaw ją ręcznie.');
 		throw new Aborted();
 	};
 

@@ -16,7 +16,7 @@ const WEAR_SPEECH: Record<string, string> = {
 	needs_replacement: 'plaster do wymiany',
 };
 
-export const ASK_SLOTS = 'Miejsca w gnieździe?';
+export const ASK_SLOTS = 'Ile jest ramek w ulu?';
 export const ASK_BROOD = 'Czerw?';
 export const ASK_HONEY = 'Miód?';
 export const ASK_POLLEN = 'Pierzga?';
