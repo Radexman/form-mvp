@@ -7,12 +7,9 @@ import type { FormValues } from '../../schema';
 import { buildMeta, formatDatePl, labelOf, labelsOf } from '../../summary.helpers';
 import { QUEEN_CELLS_OPTIONS, QUEEN_MARKER_COLOR_OPTIONS, QUEEN_STATUS_OPTIONS } from '../queen/queen.schema';
 import { BROOD_TYPE_OPTIONS } from '../brood/brood.schema';
-import {
-	COLONY_BEHAVIOR_OPTIONS,
-	COLONY_HIVE_SPACE_OPTIONS,
-	COLONY_HONEY_STORES_OPTIONS,
-} from '../colony/colony.schema';
-import { COMB_CONDITION_OPTIONS } from '../comb/comb.schema';
+import { COLONY_BEHAVIOR_OPTIONS, COLONY_HIVE_SPACE_OPTIONS } from '../colony/colony.schema';
+import { deriveComb, formatPl } from '../comb/comb.derive';
+import { COMB_CONDITION_OPTIONS, HONEY_SUFFICIENCY_OPTIONS } from '../comb/comb.schema';
 import { ACTION_OPTIONS } from '../actions/actions.schema';
 import { HEALTH_CONDITION_OPTIONS } from '../health/health.schema';
 
@@ -71,10 +68,18 @@ function Section({
 	);
 }
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+function Row({ label, value, accent }: { label: string; value: React.ReactNode; accent?: string }) {
 	return (
 		<div className='flex justify-between gap-3 text-sm'>
-			<dt className='text-muted'>{label}</dt>
+			<dt className='flex items-center gap-2 text-muted'>
+				{accent && (
+					<span
+						className='h-2 w-2 shrink-0 rounded-full'
+						style={{ background: accent }}
+					/>
+				)}
+				{label}
+			</dt>
 			<dd className='text-right text-foreground'>{value}</dd>
 		</div>
 	);
@@ -96,6 +101,14 @@ export function StepSummary({
 	const v = useWatch({ control }) as FormValues;
 
 	const meta = buildMeta(hiveNumber, inspectionNumber);
+
+	// Recomputed here purely to preview what the service will derive from the frames.
+	const comb = deriveComb({
+		frame_type: v.frame_type ?? 'wielkopolska',
+		slots: v.slots,
+		low_confidence: v.low_confidence,
+		frames: v.frames ?? [],
+	});
 
 	const broodTypes = labelsOf(BROOD_TYPE_OPTIONS, v.brood_types);
 	const actions = labelsOf(ACTION_OPTIONS, v.selected);
@@ -171,17 +184,35 @@ export function StepSummary({
 				<Section title='Rodzina' stepKey='colony' onEdit={onEdit}>
 					<Row label='Obsiadane ramki' value={v.frames_covered} />
 					<Row label='Zachowanie' value={labelOf(COLONY_BEHAVIOR_OPTIONS, v.behavior)} />
-					<Row label='Zapasy miodu' value={labelOf(COLONY_HONEY_STORES_OPTIONS, v.honey_stores)} />
 					<Row label='Przestrzeń' value={labelOf(COLONY_HIVE_SPACE_OPTIONS, v.hive_space)} />
-					<Row label='Kilogramy miodu' value={`${v.honey_kg} kg`} />
 				</Section>
 
 				<Section title='Plastry i zasoby' stepKey='comb' onEdit={onEdit}>
-					<Row label='Ramki z czerwiem' value={v.frames_brood} />
-					<Row label='Ramki z miodem' value={v.frames_honey} />
-					<Row label='Ramki z pierzgą' value={v.frames_pollen} />
-					<Row label='Ramki puste' value={v.frames_empty} />
-					<Row label='Stan plastrów' value={labelOf(COMB_CONDITION_OPTIONS, v.comb_condition)} />
+					<Row label='Ramki' value={`${v.frames?.length ?? 0} z ${v.slots} miejsc`} />
+					<Row
+						label='Czerw'
+						accent='var(--comb-brood)'
+						value={`${formatPl(comb.brood_frames_equiv)} ramki`}
+					/>
+					<Row
+						label='Miód'
+						accent='var(--comb-honey)'
+						value={`${formatPl(comb.honey_kg, 2)} kg (${formatPl(comb.honey_frames_equiv)} × ${formatPl(comb.frame_capacity_kg, 2)} kg)`}
+					/>
+					<Row
+						label='Pierzga'
+						accent='var(--comb-pollen)'
+						value={`${formatPl(comb.pollen_frames_equiv)} ramki`}
+					/>
+					<Row
+						label='Wolne plastry'
+						accent='var(--comb-empty)'
+						value={`${formatPl(comb.empty_frames_equiv)} ramki`}
+					/>
+					<Row label='Węza' value={comb.foundation_frames} />
+					<Row label='Zapasy miodu' value={labelOf(HONEY_SUFFICIENCY_OPTIONS, comb.honey_stores)} />
+					<Row label='Stan plastrów' value={labelOf(COMB_CONDITION_OPTIONS, comb.comb_condition)} />
+					{comb.unrated_frames > 0 && <Row label='Bez oceny plastra' value={`${comb.unrated_frames} ramki`} />}
 				</Section>
 
 				<Section title='Wykonane działania' stepKey='actions' onEdit={onEdit}>

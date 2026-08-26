@@ -87,12 +87,15 @@ export function NumberField({
 	placeholder,
 	min,
 	max,
+	onValueChange,
 }: {
 	name: FieldName;
 	label: string;
 	placeholder?: string;
 	min?: number;
 	max?: number;
+	/** Fires after the form value settles — for fields that drive other state. */
+	onValueChange?: (value: number) => void;
 }) {
 	const { control } = useFormContext<FormValues>();
 
@@ -111,7 +114,10 @@ export function NumberField({
 						max={max}
 						invalid={!!fieldState.error}
 						value={field.value === undefined || Number.isNaN(field.value) ? '' : String(field.value)}
-						onValueChange={(details) => field.onChange(details.valueAsNumber)}
+						onValueChange={(details) => {
+							field.onChange(details.valueAsNumber);
+							onValueChange?.(details.valueAsNumber);
+						}}
 					>
 						<NumberInput.Control className='flex items-stretch overflow-hidden rounded-md border border-border bg-surface-2 focus-within:border-accent data-invalid:border-danger'>
 							<NumberInput.Input

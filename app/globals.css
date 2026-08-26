@@ -14,6 +14,13 @@
 	--muted: #86efac;
 	--subtle: #4b7a57;
 	--border: #2d4232;
+	/* Frame composition. Kept far enough apart in both hue and lightness to stay
+	   separable in the ten-cell fill bar: brood is the dull dark one, honey the
+	   bright one, pollen the saturated mid. */
+	--comb-brood: #b07a45; /* capped brood — brown, lifted enough to stay legible as text */
+	--comb-honey: #f7cf47; /* golden yellow */
+	--comb-pollen: #ec7a2c; /* orange */
+	--comb-empty: #5c635e; /* drawn but unused — neutral grey, reads as "nothing here" */
 }
 
 @theme inline {
@@ -34,6 +41,11 @@
 	--color-muted: var(--muted);
 	--color-subtle: var(--subtle);
 	--color-border: var(--border);
+	/* frame composition */
+	--color-comb-brood: var(--comb-brood);
+	--color-comb-honey: var(--comb-honey);
+	--color-comb-pollen: var(--comb-pollen);
+	--color-comb-empty: var(--comb-empty);
 	/* fonts */
 	--font-sans: var(--font-dm-sans);
 	--font-mono: var(--font-dm-mono);
