@@ -44,7 +44,7 @@ export const colonyVoiceStep: VoiceStep = {
 		{
 			kind: 'choice',
 			name: 'behavior',
-			prompt: 'Jakie jest zachowanie rodziny?',
+			prompt: 'Jakie jest zachowanie pszczół?',
 			choices: BEHAVIOR_CHOICES,
 			readBack: (value) => {
 				const found = label(COLONY_BEHAVIOR_OPTIONS, value);
