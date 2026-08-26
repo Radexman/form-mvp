@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCombView } from '../../comb-view';
 import { useFormContext, useWatch } from 'react-hook-form';
 
-import { useCombDialogue, type DialoguePhase } from '../../../../lib/voice/useCombDialogue';
 import { NumberField } from '../../fields';
 import type { FormValues } from '../../schema';
 import { deriveComb, formatPl, frameFilled } from './comb.derive';
@@ -14,6 +13,7 @@ import {
 	FRAME_TENTHS,
 	MAX_SLOTS,
 	makeFrame,
+	renumberFrames,
 	type CombCondition,
 	type CombState,
 	type FrameResource,
@@ -119,23 +119,23 @@ function TenthsRow({
 	onChange: (value: number) => void;
 }) {
 	const stepClass =
-		'h-14 w-14 shrink-0 rounded-lg border border-border bg-surface-2 text-2xl leading-none text-foreground transition-colors hover:bg-surface-3 disabled:opacity-25';
+		'h-12 w-12 shrink-0 rounded-lg border border-border bg-surface-2 text-2xl leading-none text-foreground transition-colors hover:bg-surface-3 disabled:opacity-25 sm:h-14 sm:w-14';
 	const active = value > 0;
 
 	return (
 		<div
-			className='flex items-center gap-3 rounded-lg border-l-4 py-1.5 pl-2 transition-colors'
+			className='flex items-center gap-2 rounded-lg border-l-4 py-1.5 pl-2 transition-colors sm:gap-3'
 			style={{
 				borderLeftColor: active ? color : 'var(--border)',
 				background: active ? `color-mix(in srgb, ${color} 10%, transparent)` : 'transparent',
 			}}
 		>
-			<span className='flex w-24 shrink-0 items-center gap-2 text-sm text-foreground'>
+			<span className='flex w-20 shrink-0 items-center gap-1.5 text-sm text-foreground sm:w-24 sm:gap-2'>
 				<span
 					className='h-3.5 w-3.5 shrink-0 rounded-full'
 					style={{ background: color }}
 				/>
-				{label}
+				<span className='truncate'>{label}</span>
 			</span>
 			<button
 				type='button'
@@ -147,7 +147,7 @@ function TenthsRow({
 				−
 			</button>
 			<span
-				className='flex-1 text-center font-mono text-2xl transition-colors'
+				className='min-w-0 flex-1 text-center font-mono text-xl transition-colors sm:text-2xl'
 				style={{ color: active ? color : 'var(--subtle)' }}
 			>
 				{value * 10}%
@@ -170,77 +170,8 @@ function TenthsRow({
  * or too washed (empty grey) to carry text on this background, so the accent is
  * kept to the rule and the dot.
  */
-function MicIcon({ className = 'h-5 w-5' }: { className?: string }) {
-	return (
-		<svg
-			className={className}
-			viewBox='0 0 24 24'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth='1.75'
-			strokeLinecap='round'
-			strokeLinejoin='round'
-			aria-hidden='true'
-		>
-			<rect
-				x='9'
-				y='2'
-				width='6'
-				height='11'
-				rx='3'
-			/>
-			<path d='M5 10a7 7 0 0 0 14 0' />
-			<path d='M12 17v5' />
-		</svg>
-	);
-}
-
-function StopIcon({ className = 'h-5 w-5' }: { className?: string }) {
-	return (
-		<svg
-			className={className}
-			viewBox='0 0 24 24'
-			fill='currentColor'
-			aria-hidden='true'
-		>
-			<rect
-				x='6.5'
-				y='6.5'
-				width='11'
-				height='11'
-				rx='2.5'
-			/>
-		</svg>
-	);
-}
 
 /** Chat-style waiting indicator, on the side the next message will land. */
-function Listening() {
-	return (
-		<span
-			className='flex items-center gap-1.5 py-1'
-			role='status'
-			aria-label='Słucham'
-		>
-			{[0, 1, 2].map((dot) => (
-				<span
-					key={dot}
-					className='h-2 w-2 animate-pulse rounded-full bg-accent'
-					style={{ animationDelay: `${dot * 160}ms`, animationDuration: '1.1s' }}
-				/>
-			))}
-		</span>
-	);
-}
-
-const PHASE_HINT: Record<DialoguePhase, string> = {
-	idle: 'Powiedz np. „miód 8, pierzga 1”, a potem „dalej”. Możesz też mówić „węza”, „pusta”, „stary”, „wstecz”, „stop”.',
-	slots: 'Podaj liczbę miejsc w gnieździe…',
-	frame: 'Opisz ramkę…',
-	confirm: 'Powiedz „dalej”, albo popraw, np. „czerw 7”.',
-	repair: 'Pytam po kolei…',
-	done: 'Wszystkie ramki zapisane.',
-};
 
 function Stat({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent: string }) {
 	return (
@@ -253,7 +184,7 @@ function Stat({ label, value, hint, accent }: { label: string; value: string; hi
 					className='h-2 w-2 shrink-0 rounded-full'
 					style={{ background: accent }}
 				/>
-				{label}
+				<span className='truncate'>{label}</span>
 			</span>
 			<span className='font-mono text-xl text-foreground'>{value}</span>
 			{hint && <span className='text-xs text-muted'>{hint}</span>}
@@ -268,7 +199,7 @@ export function StepComb() {
 		getValues,
 		formState: { errors },
 	} = useFormContext<FormValues>();
-	const [active, setActive] = useState(0);
+	const { active, setActive } = useCombView();
 
 	const frames = (useWatch({ control, name: 'frames' }) ?? []) as FrameValues[];
 	const slots = (useWatch({ control, name: 'slots' }) ?? 0) as number;
@@ -279,38 +210,12 @@ export function StepComb() {
 
 	const derived = deriveComb({ frame_type: frameType, slots, low_confidence: false, frames });
 
-	/**
-	 * Array order is the box, left to right, so `position` is always derived from
-	 * it — renumbering here keeps the chips, the header and the payload agreeing
-	 * after a frame is moved, added or removed.
-	 */
-	const setFrames = (next: FrameValues[]) =>
-		setValue(
-			'frames',
-			next.map((item, position) => ({ ...item, position: position + 1 })),
-			{ shouldDirty: true },
-		);
+	const setFrames = (next: FrameValues[]) => setValue('frames', renumberFrames(next), { shouldDirty: true });
 
 	const update = (patch: Partial<FrameValues>) => {
 		if (!frame) return;
 		setFrames(frames.map((item, i) => (i === index ? { ...item, ...patch } : item)));
 	};
-
-	// Voice writes through these same setters — it is an input source for the
-	// form, not a second copy of the data.
-	const dialogue = useCombDialogue({
-		getFrames: () => (getValues('frames') ?? []) as FrameValues[],
-		setFrames,
-		setSlots: (value) => setValue('slots', value, { shouldDirty: true }),
-		setActive,
-	});
-
-	// Keep the newest turn in view, the way a chat thread does.
-	const logRef = useRef<HTMLDivElement>(null);
-	useEffect(() => {
-		const node = logRef.current;
-		if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
-	}, [dialogue.log.length]);
 
 	/** Slots is the box; the frame list follows it, growing and truncating from the end. */
 	const syncSlots = (next: number) => {
@@ -322,9 +227,7 @@ export function StepComb() {
 				? current.slice(0, next)
 				: [
 						...current,
-						...Array.from({ length: next - current.length }, (_, offset) =>
-							makeFrame(current.length + offset + 1),
-						),
+						...Array.from({ length: next - current.length }, (_, offset) => makeFrame(current.length + offset + 1)),
 					];
 		setFrames(resized);
 		setActive((position) => Math.min(position, resized.length - 1));
@@ -378,81 +281,9 @@ export function StepComb() {
 	return (
 		<div className='flex flex-col gap-6'>
 			<p className='text-sm text-subtle'>
-				Ramka po ramce, w dziesiątych częściach. Kilogramy miodu i zapasy policzy raport — tu wpisujesz tylko
-				to, co widzisz.
+				Ramka po ramce, w dziesiątych częściach. Kilogramy miodu i zapasy policzy raport — tu wpisujesz tylko to, co
+				widzisz.
 			</p>
-
-			{/* The dialogue asks for slots itself, so it sits above that field. */}
-			{dialogue.supported ? (
-				<div className='flex flex-col gap-3 rounded-lg border border-border bg-surface-2/50 p-4'>
-					<div className='flex items-start justify-between gap-3'>
-						<div className='flex min-w-0 flex-col gap-0.5'>
-							<span className='flex items-center gap-2 text-sm font-semibold text-foreground'>
-								<MicIcon className='h-4 w-4 text-muted' />
-								Dyktowanie ramek
-							</span>
-							<span className='text-xs text-subtle'>{PHASE_HINT[dialogue.phase]}</span>
-						</div>
-						{dialogue.running ? (
-							<button
-								type='button'
-								onClick={dialogue.stop}
-								className='flex min-h-14 shrink-0 items-center gap-2 rounded-lg border border-danger bg-danger/10 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/20'
-							>
-								<StopIcon className='h-4 w-4' />
-								Stop
-							</button>
-						) : (
-							<button
-								type='button'
-								onClick={() => void dialogue.start()}
-								className='flex min-h-14 shrink-0 items-center gap-2 rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent-dim hover:text-foreground'
-							>
-								<MicIcon />
-								Mów
-							</button>
-						)}
-					</div>
-
-					{(dialogue.log.length > 0 || dialogue.running) && (
-						<div
-							ref={logRef}
-							className='flex max-h-80 flex-col gap-2.5 overflow-y-auto rounded-lg border border-border bg-surface p-3'
-						>
-							{dialogue.log.map((turn, position) => (
-								<div
-									key={`${position}-${turn.text}`}
-									className={`flex ${turn.role === 'you' ? 'justify-end' : 'justify-start'}`}
-								>
-									<p
-										className={`max-w-[85%] px-4 py-2.5 text-base leading-snug text-foreground ${
-											turn.role === 'you'
-												? 'rounded-2xl rounded-br-md bg-accent/15 ring-1 ring-accent/30'
-												: 'rounded-2xl rounded-bl-md bg-surface-3'
-										}`}
-									>
-										{turn.text}
-									</p>
-								</div>
-							))}
-							{/* Waiting on the beekeeper, so it sits where their reply will. */}
-							{dialogue.running && (
-								<div className='flex justify-end'>
-									<span className='rounded-2xl rounded-br-md bg-accent/15 px-4 py-2.5 ring-1 ring-accent/30'>
-										<Listening />
-									</span>
-								</div>
-							)}
-						</div>
-					)}
-
-					{dialogue.error && <p className='text-sm text-danger'>{dialogue.error}</p>}
-				</div>
-			) : (
-				<p className='text-xs text-subtle'>
-					Dyktowanie ramek wymaga przeglądarki Chrome (Android). Tutaj wpisz ramki ręcznie.
-				</p>
-			)}
 
 			<div className='sm:max-w-xs'>
 				<NumberField
@@ -502,9 +333,7 @@ export function StepComb() {
 									: 'border-border bg-surface-2 hover:border-subtle'
 							}`}
 						>
-							<span
-								className={`font-mono text-xs ${position === index ? 'text-foreground' : 'text-muted'}`}
-							>
+							<span className={`font-mono text-xs ${position === index ? 'text-foreground' : 'text-muted'}`}>
 								{item.position}
 							</span>
 							<FrameFill
@@ -519,11 +348,10 @@ export function StepComb() {
 			{listError && <p className='text-sm text-danger'>{listError}</p>}
 
 			{frame && (
-				<div className='flex flex-col gap-5 rounded-lg border border-border bg-surface-2/50 p-4'>
+				<div className='flex flex-col gap-5 rounded-lg border border-border bg-surface-2/50 p-3 sm:p-4'>
 					<div className='flex items-center justify-between'>
 						<h3 className='text-base font-semibold text-foreground'>
-							Ramka {frame.position}{' '}
-							<span className='text-sm font-normal text-subtle'>z {frames.length}</span>
+							Ramka {frame.position} <span className='text-sm font-normal text-subtle'>z {frames.length}</span>
 						</h3>
 						<div className='flex gap-2'>
 							<button
@@ -601,12 +429,12 @@ export function StepComb() {
 								<div className='flex justify-between text-xs text-subtle'>
 									<span>Wypełnienie {filled * 10}%</span>
 									<span className='flex items-center gap-1.5'>
-									<span
-										className='h-2 w-2 rounded-full'
-										style={{ background: 'var(--comb-empty)' }}
-									/>
-									Puste {(FRAME_TENTHS - filled) * 10}%
-								</span>
+										<span
+											className='h-2 w-2 rounded-full'
+											style={{ background: 'var(--comb-empty)' }}
+										/>
+										Puste {(FRAME_TENTHS - filled) * 10}%
+									</span>
 								</div>
 							</div>
 

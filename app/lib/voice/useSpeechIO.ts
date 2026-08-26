@@ -113,6 +113,9 @@ export function useSpeechIO(): SpeechIO {
 
 		localPreferenceRef.current ??= prefersLocal();
 		const useLocal = await localPreferenceRef.current;
+		// The availability probe can outlast a Stop; without this the mic would
+		// open after the user has already ended the dialogue.
+		if (cancelledRef.current) throw new ListenError('aborted');
 
 		return new Promise<string[]>((resolve, reject) => {
 			const recognition = new Ctor();

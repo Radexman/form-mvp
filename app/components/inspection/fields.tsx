@@ -36,6 +36,7 @@ export function TextField({ name, label, placeholder }: { name: FieldName; label
 
 	return (
 		<Field.Root
+			data-field={name}
 			invalid={!!error}
 			className='flex flex-col gap-1.5'
 		>
@@ -66,6 +67,7 @@ export function TextareaField({
 
 	return (
 		<Field.Root
+			data-field={name}
 			invalid={!!error}
 			className='flex flex-col gap-1.5'
 		>
@@ -105,6 +107,7 @@ export function NumberField({
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>
@@ -163,6 +166,7 @@ export function SelectField({
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>
@@ -221,10 +225,7 @@ export function MultiSelectField({
 	placeholder?: string;
 }) {
 	const { control } = useFormContext<FormValues>();
-	const collection = useMemo(
-		() => createListCollection({ items: options, groupBy: (item) => item.group }),
-		[options],
-	);
+	const collection = useMemo(() => createListCollection({ items: options, groupBy: (item) => item.group }), [options]);
 
 	return (
 		<Controller
@@ -321,6 +322,7 @@ export function RadioField({
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-2'
 				>
@@ -367,6 +369,7 @@ export function SwatchField({ name, label, options }: { name: FieldName; label: 
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-2'
 				>
@@ -387,9 +390,7 @@ export function SwatchField({ name, label, options }: { name: FieldName; label: 
 								className='group flex h-12 w-12 cursor-pointer items-center justify-center rounded-full ring-2 ring-border ring-offset-2 ring-offset-surface transition-all hover:ring-subtle data-[state=checked]:ring-accent'
 								style={{ backgroundColor: SWATCH_COLORS[option.value] ?? 'transparent' }}
 							>
-								<span className='hidden text-base font-bold text-background group-data-[state=checked]:block'>
-									✓
-								</span>
+								<span className='hidden text-base font-bold text-background group-data-[state=checked]:block'>✓</span>
 								<RadioGroup.ItemHiddenInput />
 							</RadioGroup.Item>
 						))}
@@ -410,6 +411,7 @@ export function CheckboxField({ name, label }: { name: FieldName; label: string 
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>
@@ -479,6 +481,7 @@ export function RatingField({ name, label, count = 5 }: { name: FieldName; label
 			name={name}
 			render={({ field, fieldState }) => (
 				<Field.Root
+					data-field={name}
 					invalid={!!fieldState.error}
 					className='flex flex-col gap-1.5'
 				>

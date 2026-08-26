@@ -9,14 +9,22 @@ import { actionsDefaults, actionsObject, actionsSchema, actionsStep } from './st
 import { notesDefaults, notesObject, notesSchema, notesStep } from './steps/notes/notes.schema';
 import { healthDefaults, healthObject, healthSchema, healthStep } from './steps/health/health.schema';
 
+/**
+ * Field order, not form order: the frames come out of the box first, the queen
+ * is spotted while they do, brood is read off those same frames, and what was
+ * done to the colony is recorded after seeing its condition. Notes close.
+ *
+ * This array is the single source of order — components are looked up by key
+ * (see InspectionForm), so reordering here cannot desynchronise them.
+ */
 const STEPS = [
+	{ ...combStep, object: combObject, defaults: combDefaults },
 	{ ...queenStep, object: queenObject, defaults: queenDefaults },
 	{ ...broodStep, object: broodObject, defaults: broodDefaults },
 	{ ...colonyStep, object: colonyObject, defaults: colonyDefaults },
-	{ ...combStep, object: combObject, defaults: combDefaults },
+	{ ...healthStep, object: healthObject, defaults: healthDefaults },
 	{ ...actionsStep, object: actionsObject, defaults: actionsDefaults },
 	{ ...notesStep, object: notesObject, defaults: notesDefaults },
-	{ ...healthStep, object: healthObject, defaults: healthDefaults },
 ] as const;
 
 export const STEP_META = STEPS.map(({ key, title }) => ({ key, title }));

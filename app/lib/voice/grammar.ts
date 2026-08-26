@@ -94,8 +94,13 @@ const ORDINAL_TO_NUMBER: Record<string, number> = Object.fromEntries(
  * "pierzgi" fall out for free. Ordered longest-first where stems overlap.
  */
 const RESOURCE_STEMS: [string, FrameResource][] = [
+	// "miód" is /mjut/, so the recogniser writes it back phonetically as often as
+	// correctly — miut, mjut, miot. Each spelling gets a stem rather than relying
+	// on one, and "nektar" is kept as the reliable synonym to fall back on.
 	['miod', 'honey'],
-	['mio', 'honey'], // "miot", "mios" — common mishearings of miód
+	['mio', 'honey'], // miot, mios
+	['miu', 'honey'], // miut, miud
+	['mju', 'honey'], // mjut, mjud
 	['nektar', 'honey'],
 	['czerw', 'brood'],
 	['pierzg', 'pollen'],
@@ -112,7 +117,13 @@ const WEAR_STEMS: [string, CombCondition][] = [
 
 const FOUNDATION_STEMS = ['wez']; // węza, węzy, wezę
 const EMPTY_STEMS = ['pust']; // pusta, puste, pusty
-const NEXT_WORDS = ['dalej', 'nastepna', 'nastepny', 'zapisz', 'tak', 'ok', 'okej', 'gotowe'];
+/**
+ * "dobrze" and "dobra" are the most natural Polish confirmations, and they also
+ * prefix-match the `dobr` wear stem. Confirmation wins: wear defaults to good
+ * anyway, so losing them as a way to *set* good costs nothing, while losing them
+ * as a way to say yes would strand the confirm prompt.
+ */
+const NEXT_WORDS = ['dalej', 'nastepna', 'nastepny', 'zapisz', 'tak', 'ok', 'okej', 'gotowe', 'dobrze', 'dobra'];
 const BACK_WORDS = ['wstecz', 'poprzednia', 'poprzedni'];
 const UNDO_WORDS = ['cofnij', 'popraw', 'poprawka', 'zle', 'nie'];
 const REPEAT_WORDS = ['powtorz', 'powtorka'];
@@ -146,6 +157,10 @@ export type FrameCommand = {
 	state?: CombState;
 };
 
+/** Navigation and correction, with no field content of any kind. */
+export type ControlCommand =
+	{ kind: 'next' } | { kind: 'back' } | { kind: 'undo' } | { kind: 'repeat' } | { kind: 'stop' };
+
 export type Command =
 	| FrameCommand
 	| { kind: 'next' }
@@ -155,6 +170,23 @@ export type Command =
 	| { kind: 'stop' }
 	| { kind: 'number'; value: number }
 	| { kind: 'goto'; position: number };
+
+/**
+ * Navigation only. Field scripts compose this behind their own matcher, so
+ * "wstecz" and "stop" work at every prompt without the frame vocabulary
+ * leaking into steps that have no frames.
+ */
+export function parseControl(raw: string): ControlCommand | null {
+	const tokens = normalize(raw).split(' ').filter(Boolean);
+	if (tokens.length === 0) return null;
+
+	if (tokens.some((token) => STOP_WORDS.includes(token))) return { kind: 'stop' };
+	if (tokens.some((token) => NEXT_WORDS.includes(token))) return { kind: 'next' };
+	if (tokens.some((token) => BACK_WORDS.includes(token))) return { kind: 'back' };
+	if (tokens.some((token) => UNDO_WORDS.includes(token))) return { kind: 'undo' };
+	if (tokens.some((token) => REPEAT_WORDS.includes(token))) return { kind: 'repeat' };
+	return null;
+}
 
 /**
  * Interpret one utterance. Returns null when nothing in the grammar matched, so
@@ -183,6 +215,9 @@ export function parseCommand(raw: string): Command | null {
 
 	for (let i = 0; i < tokens.length; i += 1) {
 		const token = tokens[i];
+
+		// Confirmations are never frame content, even when they look like a stem.
+		if (NEXT_WORDS.includes(token)) continue;
 
 		if (startsWithAny(token, FOUNDATION_STEMS)) {
 			state = 'foundation';
