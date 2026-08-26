@@ -75,11 +75,34 @@ describe('queen script — the ordinary case', () => {
 
 	it('opens straight on the first question, with no separate announcement', async () => {
 		const { spoken } = await run(['widziana', 'nie', 'brak', 'dalej']);
-		expect(spoken[0]).toBe('Matka?');
-		expect(spoken[1]).toBe('Znakowana?');
+		expect(spoken[0]).toBe('Czy widziałeś matkę?');
+		expect(spoken[1]).toBe('Czy jest znakowana?');
 		// Colour is skipped for an unmarked queen.
 		expect(spoken).not.toContain('Kolor znaczka?');
-		expect(spoken[2]).toBe('Mateczniki?');
+		expect(spoken[2]).toBe('Czy są mateczniki?');
+	});
+});
+
+describe('queen script — the questions are yes/no, so bare answers must land', () => {
+	it('reads "tak" at the status prompt as the queen having been seen', async () => {
+		const { values } = await run(['tak', 'nie', 'nie', 'dalej']);
+		expect(values.queen_status).toBe('seen');
+	});
+
+	it('reads "nie" at the status prompt as not seen, not as queenless', async () => {
+		const { values } = await run(['nie', 'nie', 'nie', 'dalej']);
+		expect(values.queen_status).toBe('not_seen_brood_ok');
+	});
+
+	// The longer phrase wins, so the stronger claim is still reachable.
+	it('keeps "nie ma" meaning a missing queen', async () => {
+		const { values } = await run(['nie ma', 'nie', 'dalej']);
+		expect(values.queen_status).toBe('missing');
+	});
+
+	it('reads "nie" at the cells prompt as no queen cells', async () => {
+		const { values } = await run(['tak', 'nie', 'nie', 'dalej']);
+		expect(values).toMatchObject({ queen_cells: 'none', queen_cells_count: 0 });
 	});
 });
 
@@ -87,7 +110,7 @@ describe('queen script — conditional fields', () => {
 	it('skips marking entirely when the queen is missing', async () => {
 		const { values, spoken } = await run(['brak matki', 'rojowe', 'trzy', 'dalej']);
 
-		expect(spoken).not.toContain('Znakowana?');
+		expect(spoken).not.toContain('Czy jest znakowana?');
 		expect(values).toMatchObject({
 			queen_status: 'missing',
 			queen_marked: false,
@@ -99,7 +122,7 @@ describe('queen script — conditional fields', () => {
 
 	it('asks how many only when there are cells', async () => {
 		const { spoken } = await run(['widziana', 'nie', 'brak', 'dalej']);
-		expect(spoken).not.toContain('Ile mateczników?');
+		expect(spoken).not.toContain('Ile jest mateczników?');
 	});
 });
 
@@ -141,7 +164,7 @@ describe('queen script — confirming does not double as an answer', () => {
 	it('treats "nie" as a correction, not as unmarking', async () => {
 		const { spoken } = await run(['widziana', 'nie', 'brak', 'nie', 'widziana', 'nie', 'brak', 'dalej']);
 		// The step was restarted, so its first question was asked twice.
-		expect(spoken.filter((line) => line === 'Matka?')).toHaveLength(2);
+		expect(spoken.filter((line) => line === 'Czy widziałeś matkę?')).toHaveLength(2);
 	});
 
 	it('still amends a boolean by its own wording', async () => {

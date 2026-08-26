@@ -196,8 +196,16 @@ export function VoicePanel({
 					className={`fixed inset-x-0 bottom-0 z-40 flex flex-col border-t border-border bg-surface ${expanded ? 'top-0 z-50' : ''}`}
 				>
 					{/* Same max-width and gutters as the page, so the bar is full bleed
-					    but its contents line up with the form above it. */}
-					<div className={`mx-auto flex w-full max-w-6xl flex-col px-4 ${expanded ? 'h-full' : ''}`}>
+					    but its contents line up with the form above it. The gutters grow
+					    to clear the safe area, which on a phone in landscape is where the
+					    rounded corner would otherwise cut into a right-aligned bubble. */}
+					<div
+						className={`mx-auto flex w-full max-w-6xl flex-col ${expanded ? 'h-full' : ''}`}
+						style={{
+							paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+							paddingRight: 'max(1rem, env(safe-area-inset-right))',
+						}}
+					>
 						<header className='flex items-center justify-between gap-3 py-2.5'>
 							<div className='flex min-w-0 flex-col'>
 								<span className='flex items-center gap-2 text-sm font-semibold text-foreground'>
@@ -227,13 +235,16 @@ export function VoicePanel({
 							</button>
 						</header>
 
+						{/* Scrolling on one axis clips the other, and a bubble's ring and
+						    shadow sit outside its border box — so without a little room here
+						    the right edge of every reply is shaved off. */}
 						<div
 							ref={logRef}
 							onScroll={(event) => {
 								const node = event.currentTarget;
 								followRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
 							}}
-							className={`flex flex-col gap-2.5 overflow-y-auto overscroll-contain border-t border-border/60 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
+							className={`flex flex-col gap-2.5 overflow-y-auto overscroll-contain border-t border-border/60 px-1.5 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
 						>
 							{log.map((turn, position) => (
 								<Bubble

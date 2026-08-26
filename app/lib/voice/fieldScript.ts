@@ -18,7 +18,7 @@ export type FieldValues = Record<string, unknown>;
 
 interface FieldBase {
 	name: string;
-	/** What the app asks, e.g. "Matka?" */
+	/** What the app asks, e.g. "Czy widziałeś matkę?" */
 	prompt: string;
 	/** Skipped entirely when this returns false. Mirror the zod refinements. */
 	when?: (values: FieldValues) => boolean;

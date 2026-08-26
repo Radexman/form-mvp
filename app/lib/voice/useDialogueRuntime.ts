@@ -55,6 +55,13 @@ export interface DialogueStatus {
 
 const IDLE_STATUS: DialogueStatus = { stepKey: null, fieldName: null, summary: null };
 
+/**
+ * The recogniser hands back lower-case text. The app's own lines are written as
+ * sentences, so capitalising the first letter is what makes the two sides of the
+ * transcript read as one conversation rather than a log.
+ */
+export const sentenceCase = (text: string) => text.replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase('pl-PL'));
+
 export interface DialogueRuntime {
 	supported: boolean;
 	running: boolean;
@@ -99,7 +106,7 @@ export function useDialogueRuntime(): DialogueRuntime {
 	const push = useCallback((role: DialogueTurn['role'], text: string) => {
 		// Kept in full so the expanded view can scroll back over the whole
 		// exchange; capped only to bound memory on a very long session.
-		setLog((entries) => [...entries, { role, text }].slice(-MAX_LOG_TURNS));
+		setLog((entries) => [...entries, { role, text: role === 'you' ? sentenceCase(text) : text }].slice(-MAX_LOG_TURNS));
 	}, []);
 
 	const guard = useCallback(() => {

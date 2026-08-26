@@ -11,9 +11,13 @@ import { QUEEN_CELLS_OPTIONS, QUEEN_MARKER_COLOR_OPTIONS, QUEEN_STATUS_OPTIONS }
  * writing out here.
  */
 
+// The prompt is a yes/no question, so a bare "tak" and a bare "nie" have to
+// land somewhere. "nie" is the weaker claim of the two negatives — it says the
+// queen was not seen, not that the colony is queenless — so it goes there, and
+// "nie ma" still wins for `missing` because the longer phrase takes precedence.
 const STATUS_CHOICES = choicesFrom(QUEEN_STATUS_OPTIONS, {
-	seen: ['widziana', 'widzialem', 'widzialam', 'jest', 'obecna', 'znalazlem'],
-	not_seen_brood_ok: ['nie widziana', 'niewidziana', 'czerw ok', 'czerw jest', 'nie widzialem', 'po czerwiu'],
+	seen: ['widziana', 'widzialem', 'widzialam', 'jest', 'obecna', 'znalazlem', 'tak'],
+	not_seen_brood_ok: ['nie', 'nie widziana', 'niewidziana', 'czerw ok', 'czerw jest', 'nie widzialem', 'po czerwiu'],
 	missing: ['brak', 'nie ma', 'bezmateczna', 'zadnej'],
 });
 
@@ -26,7 +30,7 @@ const COLOR_CHOICES = choicesFrom(QUEEN_MARKER_COLOR_OPTIONS, {
 });
 
 const CELLS_CHOICES = choicesFrom(QUEEN_CELLS_OPTIONS, {
-	none: ['brak', 'nie ma', 'zadnych', 'czysto'],
+	none: ['nie', 'brak', 'nie ma', 'zadnych', 'czysto'],
 	emergency: ['ratunkowe', 'ratunkowy'],
 	swarm: ['rojowe', 'rojowy', 'rojka'],
 	supersedure: ['cicha wymiana', 'cicha', 'wymiana'],
@@ -67,7 +71,7 @@ export const queenVoiceStep: VoiceStep = {
 		{
 			kind: 'choice',
 			name: 'queen_status',
-			prompt: 'Matka?',
+			prompt: 'Czy widziałeś matkę?',
 			choices: STATUS_CHOICES,
 			readBack: (value) => {
 				const found = label(QUEEN_STATUS_OPTIONS, value);
@@ -77,7 +81,7 @@ export const queenVoiceStep: VoiceStep = {
 		{
 			kind: 'boolean',
 			name: 'queen_marked',
-			prompt: 'Znakowana?',
+			prompt: 'Czy jest znakowana?',
 			yes: ['znakowana', 'znaczona', 'ma znaczek', 'kropka'],
 			no: ['nieznakowana', 'niezanaczona', 'bez znaczka'],
 			// A missing queen cannot be marked — mirrors the schema refinement.
@@ -98,7 +102,7 @@ export const queenVoiceStep: VoiceStep = {
 		{
 			kind: 'choice',
 			name: 'queen_cells',
-			prompt: 'Mateczniki?',
+			prompt: 'Czy są mateczniki?',
 			choices: CELLS_CHOICES,
 			readBack: (value) => {
 				const found = label(QUEEN_CELLS_OPTIONS, value);
@@ -108,7 +112,7 @@ export const queenVoiceStep: VoiceStep = {
 		{
 			kind: 'number',
 			name: 'queen_cells_count',
-			prompt: 'Ile mateczników?',
+			prompt: 'Ile jest mateczników?',
 			min: 1,
 			max: 50,
 			when: (values) => values.queen_cells !== 'none' && values.queen_cells !== undefined,
