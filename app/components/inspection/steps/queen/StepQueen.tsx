@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useFormContext, useWatch, type FieldPath } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 
 import type { FieldValues } from '../../../../lib/voice/fieldScript';
-import { useStepDialogue } from '../../../../lib/voice/useStepDialogue';
 import { CheckboxField, NumberField, RadioField, SwatchField } from '../../fields';
 import type { FormValues } from '../../schema';
-import { VoicePanel } from '../../VoicePanel';
 import { QUEEN_CELLS_OPTIONS, QUEEN_MARKER_COLOR_OPTIONS, QUEEN_STATUS_OPTIONS } from './queen.schema';
-import { QUEEN_FIELDS, queenVoiceStep, reconcileQueen } from './queen.voice';
+import { QUEEN_FIELDS, reconcileQueen } from './queen.voice';
 
 export function StepQueen() {
 	const { control, getValues, setValue } = useFormContext<FormValues>();
@@ -31,25 +29,8 @@ export function StepQueen() {
 		}
 	}, [queenStatus, queenMarked, queenCells, getValues, setValue]);
 
-	const dialogue = useStepDialogue(queenVoiceStep, {
-		getValues: () => getValues() as FieldValues,
-		setValue: (name, value) => setValue(name as FieldPath<FormValues>, value as never, { shouldDirty: true }),
-	});
-
 	return (
 		<div className='grid gap-4'>
-			<VoicePanel
-				title='Sterowanie głosem'
-				hint='Powiedz np. „widziana”, „znakowana”, „niebieski”, a na koniec „dalej”. Możesz też mówić „wstecz” i „stop”.'
-				supported={dialogue.supported}
-				running={dialogue.running}
-				log={dialogue.log}
-				error={dialogue.error}
-				onStart={() => void dialogue.start()}
-				onStop={dialogue.stop}
-				unsupportedNote='Sterowanie głosem wymaga przeglądarki Chrome (Android). Tutaj wypełnij pola ręcznie.'
-			/>
-
 			<RadioField
 				name='queen_status'
 				label='Status'

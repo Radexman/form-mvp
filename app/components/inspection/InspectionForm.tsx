@@ -3,9 +3,12 @@
 import { Steps, useSteps } from '@ark-ui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useRef, useState } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, type FieldPath } from 'react-hook-form';
 
 import { fetchCurrentWeather, type InspectionWeather } from '../../lib/inspection-context';
+import { useInspectionDialogue } from '../../lib/voice/useInspectionDialogue';
+import type { FieldValues } from '../../lib/voice/fieldScript';
+import { VoicePanel } from './VoicePanel';
 import type { Beehive } from '../../lib/beehives';
 import { buildInspectionPayload } from './payload';
 import { buildMeta } from './summary.helpers';
@@ -67,6 +70,18 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 
 	const currentStep = steps.value;
 	const isLastStep = currentStep === SUMMARY_INDEX;
+
+	// Navigation belongs here, where the stepper lives; step scripts only report
+	// whether they finished or want to go back.
+	const dialogue = useInspectionDialogue({
+		steps: STEP_META,
+		startIndex: () => Math.min(steps.value, STEP_META.length - 1),
+		goToStep: (index) => steps.setStep(index),
+		api: {
+			getValues: () => methods.getValues() as FieldValues,
+			setValue: (name, value) => methods.setValue(name as FieldPath<FormValues>, value as never, { shouldDirty: true }),
+		},
+	});
 
 	const loadWeather = useCallback(async () => {
 		setWeatherState('loading');
@@ -180,6 +195,19 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 						))}
 					</Steps.List>
 					<div className='flex min-w-0 flex-1 flex-col gap-8'>
+						{!isLastStep && (
+							<VoicePanel
+								title='Sterowanie głosem'
+								hint='Odpowiadaj na pytania, potwierdzaj słowem „dalej”. Po sekcji zapytam, czy przejść do kolejnej.'
+								supported={dialogue.supported}
+								running={dialogue.running}
+								log={dialogue.log}
+								error={dialogue.error}
+								onStart={() => void dialogue.start()}
+								onStop={dialogue.stop}
+								unsupportedNote='Sterowanie głosem wymaga przeglądarki Chrome (Android). Wypełnij formularz ręcznie.'
+							/>
+						)}
 						{STEP_META.map((meta, index) => {
 							const StepComponent = STEP_COMPONENTS[meta.key];
 							return (
