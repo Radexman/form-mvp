@@ -165,7 +165,10 @@ export async function runCombStep(runtime: DialogueRuntime, api: CombStepApi): P
 
 			for (;;) {
 				guard();
-				const command = await ask();
+				// The one turn in the whole dialogue where the beekeeper is working
+				// rather than answering: the frame has to come out and be read before
+				// there is anything to say.
+				const command = await ask('work');
 
 				if (!command) {
 					misses += 1;

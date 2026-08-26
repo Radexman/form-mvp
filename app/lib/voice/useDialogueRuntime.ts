@@ -23,23 +23,50 @@ export const MAX_MISS_STREAK = 4;
 /** Retries at a single prompt before a script falls back to something simpler. */
 export const MAX_RETRIES = 2;
 /**
- * How many further times the mic reopens, without the dialogue saying anything,
- * before it gives up on the turn.
+ * How a turn paces its listening.
  *
- * Chrome on Android plays a start earcon on every `recognition.start()` and the
- * page cannot silence it, so the count of reopens *is* the count of pings the
- * beekeeper hears. Keep it small.
- */
-export const QUIET_REOPENS = 2;
-/**
- * How long the mic stays shut between those reopens.
+ * Chrome on Android ends a quiet session after about five seconds whatever
+ * `continuous` says, and plays a start earcon on every `recognition.start()`
+ * that no page can silence. Coverage therefore *is* `start()` calls, and pings
+ * *are* coverage: no schedule both listens continuously and stays quiet.
  *
- * The engine abandons a quiet session after a few seconds, so without a gap here
- * the reopens land back-to-back and the earcon becomes the every-few-seconds ping
- * we are trying to be rid of. The cost is a stretch where nothing is heard — the
- * panel says so, rather than showing a listening indicator that is not true.
+ * Which way to lean is settled by what a gap actually costs. Speech during one is
+ * lost silently — the beekeeper answers, hears nothing, and cannot tell whether
+ * it registered — so in a form whose job is capturing answers a gap is worse than
+ * a ping. With a five-second cycle the gap sets the share of time we can hear at
+ * all: 2s is 71%, 5s is 50%, 12s only 29%. Hence the ceiling of 5s below.
+ *
+ * The cheaper lever is the lead-in. Silence we can predict — the beekeeper cannot
+ * answer while still lifting a frame — costs nothing to sit out, where a gap buys
+ * quiet by gambling that they will not speak. Spend the predictable silence up
+ * front, then stay near-continuous once an answer is actually plausible.
  */
-export const QUIET_GAP_MS = 12_000;
+export type Pacing = 'prompt' | 'work';
+
+interface PacingProfile {
+	/** Quiet time before the mic opens at all. */
+	leadInMs: number;
+	/** Quiet time before each reopen; the length is how many reopens a turn gets. */
+	gapsMs: number[];
+}
+
+export const PACING: Record<Pacing, PacingProfile> = {
+	/**
+	 * Answering a question just asked — a status, a colour, "dalej". The reply
+	 * comes within a couple of seconds or it is not coming, so open at once and
+	 * reopen back-to-back. Ordinarily the beekeeper answers inside the first cycle
+	 * and hears a single ping; the rest of the schedule only ever appears when
+	 * something has already gone wrong.
+	 */
+	prompt: { leadInMs: 0, gapsMs: [0, 0] },
+	/**
+	 * Dictating a frame. There is nothing to say until it is out and read, so the
+	 * lead-in sits out a silence we could have predicted rather than spending a
+	 * ping on it. After that the gaps stay short — this is the step whose answers
+	 * the report is actually made of, and dropping one is worse than a ping.
+	 */
+	work: { leadInMs: 3_000, gapsMs: [0, 2_000, 4_000, 5_000, 5_000] },
+};
 /** Transcript length kept for scrolling back through. */
 export const MAX_LOG_TURNS = 200;
 
@@ -90,12 +117,16 @@ export interface DialogueRuntime {
 	/** Say something, and record it in the transcript. */
 	announce: (text: string) => Promise<void>;
 	/** One turn in; the first alternative the grammar accepts, or null. */
-	ask: () => Promise<Command | null>;
+	ask: (pacing?: Pacing) => Promise<Command | null>;
 	/**
 	 * One turn in, interpreted by the caller's own matcher — how a step script
 	 * recognises its own vocabulary while sharing the retry and miss accounting.
+	 *
+	 * `pacing` says what the beekeeper is doing while we wait, which is the only
+	 * thing that makes a listening schedule right or wrong; it defaults to
+	 * answering a question, since most turns are that.
 	 */
-	askWith: <T>(match: (transcript: string) => T | null) => Promise<T | null>;
+	askWith: <T>(match: (transcript: string) => T | null, pacing?: Pacing) => Promise<T | null>;
 	/** Count a turn we could not act on. Throws Aborted once they pile up. */
 	noteMiss: () => null;
 	/** Throws Aborted if the dialogue has been stopped. Call after every await. */
@@ -161,8 +192,16 @@ export function useDialogueRuntime(): DialogueRuntime {
 	}, []);
 
 	const askWith = useCallback(
-		async <T>(match: (transcript: string) => T | null): Promise<T | null> => {
+		async <T>(match: (transcript: string) => T | null, pacing: Pacing = 'prompt'): Promise<T | null> => {
 			guard();
+			const profile = PACING[pacing];
+
+			// Silence we already knew about; opening the mic through it would spend a
+			// ping on a stretch nobody was going to speak in.
+			if (profile.leadInMs > 0) {
+				await pause(profile.leadInMs);
+				guard();
+			}
 
 			let alternatives: string[] = [];
 			// Silence is not misrecognition. The recogniser gives up on quiet after a
@@ -173,23 +212,29 @@ export function useDialogueRuntime(): DialogueRuntime {
 				try {
 					setListening(true);
 					alternatives = await io.listen();
+					setListening(false);
 					break;
 				} catch (failure) {
 					guard();
 					if (failure instanceof ListenError && failure.reason === 'not-allowed') {
+						setListening(false);
 						setError('Brak dostępu do mikrofonu. Zezwól na mikrofon albo wpisz dane ręcznie.');
 						throw new Aborted();
 					}
-					if (failure instanceof ListenError && failure.reason === 'no-speech' && quiet < QUIET_REOPENS) {
-						setListening(false);
-						await pause(QUIET_GAP_MS);
-						guard();
+					const gap = profile.gapsMs[quiet];
+					if (failure instanceof ListenError && failure.reason === 'no-speech' && gap !== undefined) {
+						// The early gaps are zero: reopen at once, and leave the indicator
+						// lit rather than blinking it off for the instant in between.
+						if (gap > 0) {
+							setListening(false);
+							await pause(gap);
+							guard();
+						}
 						continue;
 					}
+					setListening(false);
 					// Long enough to be worth a nudge, or a failure that is not silence.
 					return noteMiss();
-				} finally {
-					setListening(false);
 				}
 			}
 			guard();
@@ -209,7 +254,7 @@ export function useDialogueRuntime(): DialogueRuntime {
 		[guard, io, noteMiss, push],
 	);
 
-	const ask = useCallback(() => askWith(parseCommand), [askWith]);
+	const ask = useCallback((pacing?: Pacing) => askWith(parseCommand, pacing), [askWith]);
 
 	const stop = useCallback(() => {
 		const wasRunning = runningRef.current;
