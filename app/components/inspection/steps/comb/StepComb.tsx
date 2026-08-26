@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 
 import { useCombDialogue, type DialoguePhase } from '../../../../lib/voice/useCombDialogue';
@@ -170,6 +170,69 @@ function TenthsRow({
  * or too washed (empty grey) to carry text on this background, so the accent is
  * kept to the rule and the dot.
  */
+function MicIcon({ className = 'h-5 w-5' }: { className?: string }) {
+	return (
+		<svg
+			className={className}
+			viewBox='0 0 24 24'
+			fill='none'
+			stroke='currentColor'
+			strokeWidth='1.75'
+			strokeLinecap='round'
+			strokeLinejoin='round'
+			aria-hidden='true'
+		>
+			<rect
+				x='9'
+				y='2'
+				width='6'
+				height='11'
+				rx='3'
+			/>
+			<path d='M5 10a7 7 0 0 0 14 0' />
+			<path d='M12 17v5' />
+		</svg>
+	);
+}
+
+function StopIcon({ className = 'h-5 w-5' }: { className?: string }) {
+	return (
+		<svg
+			className={className}
+			viewBox='0 0 24 24'
+			fill='currentColor'
+			aria-hidden='true'
+		>
+			<rect
+				x='6.5'
+				y='6.5'
+				width='11'
+				height='11'
+				rx='2.5'
+			/>
+		</svg>
+	);
+}
+
+/** Chat-style waiting indicator, on the side the next message will land. */
+function Listening() {
+	return (
+		<span
+			className='flex items-center gap-1.5 py-1'
+			role='status'
+			aria-label='Słucham'
+		>
+			{[0, 1, 2].map((dot) => (
+				<span
+					key={dot}
+					className='h-2 w-2 animate-pulse rounded-full bg-accent'
+					style={{ animationDelay: `${dot * 160}ms`, animationDuration: '1.1s' }}
+				/>
+			))}
+		</span>
+	);
+}
+
 const PHASE_HINT: Record<DialoguePhase, string> = {
 	idle: 'Powiedz np. „miód 8, pierzga 1”, a potem „dalej”. Możesz też mówić „węza”, „pusta”, „stary”, „wstecz”, „stop”.',
 	slots: 'Podaj liczbę miejsc w gnieździe…',
@@ -241,6 +304,13 @@ export function StepComb() {
 		setSlots: (value) => setValue('slots', value, { shouldDirty: true }),
 		setActive,
 	});
+
+	// Keep the newest turn in view, the way a chat thread does.
+	const logRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const node = logRef.current;
+		if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+	}, [dialogue.log.length]);
 
 	/** Slots is the box; the frame list follows it, growing and truncating from the end. */
 	const syncSlots = (next: number) => {
@@ -316,40 +386,63 @@ export function StepComb() {
 			{dialogue.supported ? (
 				<div className='flex flex-col gap-3 rounded-lg border border-border bg-surface-2/50 p-4'>
 					<div className='flex items-start justify-between gap-3'>
-						<div className='flex flex-col gap-0.5'>
-							<span className='text-sm font-semibold text-foreground'>Dyktowanie ramek</span>
+						<div className='flex min-w-0 flex-col gap-0.5'>
+							<span className='flex items-center gap-2 text-sm font-semibold text-foreground'>
+								<MicIcon className='h-4 w-4 text-muted' />
+								Dyktowanie ramek
+							</span>
 							<span className='text-xs text-subtle'>{PHASE_HINT[dialogue.phase]}</span>
 						</div>
 						{dialogue.running ? (
 							<button
 								type='button'
 								onClick={dialogue.stop}
-								className='min-h-14 shrink-0 rounded-lg border border-danger bg-danger/10 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/20'
+								className='flex min-h-14 shrink-0 items-center gap-2 rounded-lg border border-danger bg-danger/10 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/20'
 							>
-								■ Stop
+								<StopIcon className='h-4 w-4' />
+								Stop
 							</button>
 						) : (
 							<button
 								type='button'
 								onClick={() => void dialogue.start()}
-								className='min-h-14 shrink-0 rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent-dim hover:text-foreground'
+								className='flex min-h-14 shrink-0 items-center gap-2 rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent-dim hover:text-foreground'
 							>
-								🎙 Mów
+								<MicIcon />
+								Mów
 							</button>
 						)}
 					</div>
 
-					{dialogue.log.length > 0 && (
-						<div className='flex flex-col gap-1 rounded-md border border-border bg-surface p-3'>
+					{(dialogue.log.length > 0 || dialogue.running) && (
+						<div
+							ref={logRef}
+							className='flex max-h-80 flex-col gap-2.5 overflow-y-auto rounded-lg border border-border bg-surface p-3'
+						>
 							{dialogue.log.map((turn, position) => (
-								<p
+								<div
 									key={`${position}-${turn.text}`}
-									className={`text-xs ${turn.role === 'app' ? 'text-muted' : 'font-medium text-foreground'}`}
+									className={`flex ${turn.role === 'you' ? 'justify-end' : 'justify-start'}`}
 								>
-									<span className='text-subtle'>{turn.role === 'app' ? '🔊 ' : '🎙 '}</span>
-									{turn.text}
-								</p>
+									<p
+										className={`max-w-[85%] px-4 py-2.5 text-base leading-snug text-foreground ${
+											turn.role === 'you'
+												? 'rounded-2xl rounded-br-md bg-accent/15 ring-1 ring-accent/30'
+												: 'rounded-2xl rounded-bl-md bg-surface-3'
+										}`}
+									>
+										{turn.text}
+									</p>
+								</div>
 							))}
+							{/* Waiting on the beekeeper, so it sits where their reply will. */}
+							{dialogue.running && (
+								<div className='flex justify-end'>
+									<span className='rounded-2xl rounded-br-md bg-accent/15 px-4 py-2.5 ring-1 ring-accent/30'>
+										<Listening />
+									</span>
+								</div>
+							)}
 						</div>
 					)}
 
