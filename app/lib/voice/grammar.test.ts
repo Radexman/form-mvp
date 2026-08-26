@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalize, ordinalPl, parseCommand, parseNumberToken } from './grammar';
+import { normalize, ordinalPl, parseCommand, parseControl, parseNumberToken } from './grammar';
 
 const frame = (values: Record<string, number>, extra: Record<string, unknown> = {}) => ({
 	kind: 'frame',
@@ -133,12 +133,25 @@ describe('parseCommand — navigation', () => {
 
 	// The prompts are "Przejść do kolejnej ramki?" and "...sekcji?", so echoing
 	// the question back is the obvious answer.
-	it.each([['kolejna ramka'], ['kolejna sekcja'], ['następna'], ['dalej'], ['tak']])(
-		'accepts "%s" as confirmation',
-		(phrase) => {
-			expect(parseCommand(phrase)).toEqual({ kind: 'next' });
-		},
-	);
+	it.each([
+		['kolejna ramka'],
+		['kolejna sekcja'],
+		['kolejna'],
+		['przejdź do kolejnej sekcji'],
+		['przejść do kolejnej ramki'],
+		['następna'],
+		['dalej'],
+		['tak'],
+	])('accepts "%s" as confirmation', (phrase) => {
+		expect(parseCommand(phrase)).toEqual({ kind: 'next' });
+	});
+
+	// "przejdź" counts as going on, so a phrasing that pairs it with a direction
+	// must not be read as the opposite of what was said.
+	it('reads "przejdź wstecz" as going back', () => {
+		expect(parseControl('przejdź wstecz')).toEqual({ kind: 'back' });
+		expect(parseControl('wstecz')).toEqual({ kind: 'back' });
+	});
 
 	it('still jumps when a frame is named by position', () => {
 		expect(parseCommand('ramka druga')).toEqual({ kind: 'goto', position: 2 });

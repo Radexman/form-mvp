@@ -131,11 +131,20 @@ const NEXT_WORDS = [
 	'dalej',
 	'nastepna',
 	'nastepny',
-	// Echoing the question back — "kolejna ramka", "kolejna sekcja" — is a
-	// natural way to answer it, and neither noun needs matching for that to work.
+	// Echoing the question back — "kolejna ramka", "przejdź do kolejnej sekcji" —
+	// is a natural way to answer it. Matching is exact, so the inflections the
+	// question itself uses have to be listed alongside the base forms; neither
+	// noun needs matching for any of it to work.
 	'kolejna',
 	'kolejny',
 	'kolejne',
+	'kolejnej',
+	'kolejnego',
+	'kolejnych',
+	'nastepnej',
+	'nastepnego',
+	'przejdz',
+	'przejsc',
 	'zapisz',
 	'tak',
 	'ok',
@@ -201,8 +210,11 @@ export function parseControl(raw: string): ControlCommand | null {
 	if (tokens.length === 0) return null;
 
 	if (tokens.some((token) => STOP_WORDS.includes(token))) return { kind: 'stop' };
-	if (tokens.some((token) => NEXT_WORDS.includes(token))) return { kind: 'next' };
+	// Backwards before forwards: "przejdź" now counts as going on, so "przejdź
+	// wstecz" would otherwise be read as the opposite of what was said. Nothing
+	// in BACK_WORDS ever means "next", so checking it first is free.
 	if (tokens.some((token) => BACK_WORDS.includes(token))) return { kind: 'back' };
+	if (tokens.some((token) => NEXT_WORDS.includes(token))) return { kind: 'next' };
 	if (tokens.some((token) => UNDO_WORDS.includes(token))) return { kind: 'undo' };
 	if (tokens.some((token) => REPEAT_WORDS.includes(token))) return { kind: 'repeat' };
 	return null;
