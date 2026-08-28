@@ -17,8 +17,23 @@ const NAV_ITEM_BASE = 'flex items-center gap-2.25 border-l-2 px-3.5 py-1.75 text
 const NAV_ITEM_ACTIVE = 'border-l-accent bg-accent/5 text-foreground';
 const NAV_ITEM_INACTIVE = 'border-l-transparent text-muted hover:text-foreground';
 
-/** Desktop only. Below `lg` the same destinations render as `MobileNav`. */
-export function Sidebar() {
+interface SidebarProps {
+	/** Already shortened by the layout, e.g. "Jan P.". */
+	userName: string;
+	userInitials: string;
+	isPremium: boolean;
+}
+
+/**
+ * Desktop only. Below `lg` the same destinations render as `MobileNav`, which
+ * has no footer — so the name, plan and sign-out control simply do not exist on
+ * phones (`Ustawienia` is the stand-in until Phase 3).
+ *
+ * Still a client component, for `usePathname` only. The session is read by the
+ * layout and handed down as props: this file must not reach for `auth()`, which
+ * would pull Prisma into the client bundle.
+ */
+export function Sidebar({ userName, userInitials, isPremium }: SidebarProps) {
 	const pathname = usePathname();
 
 	return (
@@ -53,11 +68,15 @@ export function Sidebar() {
 
 			<div className='flex items-center gap-2.25 border-t border-t-border px-3.5 py-3'>
 				<span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-2 bg-surface-3 text-[11px] font-semibold text-accent'>
-					RS
+					{userInitials}
 				</span>
 				<span className='flex min-w-0 flex-1 flex-col'>
-					<span className='truncate text-[12px] font-medium text-foreground'>Radosław S.</span>
-					<span className='text-[10px] text-accent'>Premium</span>
+					<span className='truncate text-[12px] font-medium text-foreground'>{userName}</span>
+					{/* Premium is the accent green; Free stays muted so the badge reads as
+					    a status rather than as a permanent decoration. */}
+					<span className={`text-[10px] ${isPremium ? 'text-accent' : 'text-muted'}`}>
+						{isPremium ? 'Premium' : 'Free'}
+					</span>
 				</span>
 
 				{/*

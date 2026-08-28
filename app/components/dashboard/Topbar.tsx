@@ -28,7 +28,9 @@ export function Topbar({ apiaryName, location }: TopbarProps) {
 			{/* min-w-0 lets the name truncate instead of shoving the buttons off-screen. */}
 			<div className='flex min-w-0 items-center gap-2'>
 				<span className='truncate text-[14px] font-medium text-foreground lg:text-[13px]'>{apiaryName}</span>
-				<span className='hidden shrink-0 text-[12px] text-muted sm:inline'>· {location}</span>
+				{/* The separator belongs to the location, not to the bar — an apiary with
+				    no location set would otherwise render a dangling "·". */}
+				{location && <span className='hidden shrink-0 text-[12px] text-muted sm:inline'>· {location}</span>}
 			</div>
 
 			<div className='flex shrink-0 items-center gap-2'>

@@ -3,6 +3,7 @@
 ## Overview
 
 Replace NextAuth default pages with custom UI. Update user icon, email and username in bottom of sidebar.
+The login / register page should be split in two fractions, one is good image of the apiary with the overlay and welcoming text and the second one the actual user credential login / register with credentials or google
 
 ## Requirements
 
