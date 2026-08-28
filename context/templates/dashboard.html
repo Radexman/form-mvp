@@ -1,328 +1,830 @@
-
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0d0f0d;
-  --surface:#141814;
-  --surface2:#1a1f1a;
-  --surface3:#202620;
-  --border:rgba(255,255,255,0.06);
-  --border2:rgba(255,255,255,0.10);
-  --text:#e8f0e8;
-  --muted:#6b7d6b;
-  --subtle:#3a4a3a;
-  --green:#4ade80;
-  --green-dim:#166534;
-  --amber:#fbbf24;
-  --red:#f87171;
-  --mono:'DM Mono','Fira Mono',monospace;
-}
-body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;font-size:14px;line-height:1.5}
-.shell{display:flex;height:100vh;min-height:640px}
-.sidebar{width:192px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0}
-.logo{display:flex;align-items:center;gap:9px;padding:18px 16px 16px;border-bottom:1px solid var(--border)}
-.logo-mark{width:26px;height:26px;border-radius:6px;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.logo-mark svg{width:14px;height:14px;stroke:#0d0f0d;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-.logo-name{font-size:13px;font-weight:600;letter-spacing:-0.01em;color:var(--text)}
-.nav{padding:8px 0;flex:1}
-.nav-item{display:flex;align-items:center;gap:9px;padding:7px 14px;font-size:13px;color:var(--muted);cursor:pointer;border-left:2px solid transparent;transition:color 0.1s}
-.nav-item:hover{color:var(--text)}
-.nav-item.active{color:var(--text);border-left-color:var(--green);background:rgba(74,222,128,0.05)}
-.nav-item svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;flex-shrink:0}
-.sidebar-footer{padding:12px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:9px}
-.avatar{width:28px;height:28px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;border:1px solid var(--border2)}
-.avatar-info{display:flex;flex-direction:column}
-.avatar-name{font-size:12px;font-weight:500;color:var(--text)}
-.avatar-plan{font-size:10px;color:var(--muted)}
+	* {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+	:root {
+		--bg: #0d0f0d;
+		--surface: #141814;
+		--surface2: #1a1f1a;
+		--surface3: #202620;
+		--border: rgba(255, 255, 255, 0.06);
+		--border2: rgba(255, 255, 255, 0.1);
+		--text: #e8f0e8;
+		--muted: #6b7d6b;
+		--subtle: #3a4a3a;
+		--green: #4ade80;
+		--green-dim: #166534;
+		--amber: #fbbf24;
+		--red: #f87171;
+		--mono: 'DM Mono', 'Fira Mono', monospace;
+	}
+	body {
+		background: var(--bg);
+		color: var(--text);
+		font-family: system-ui, sans-serif;
+		font-size: 14px;
+		line-height: 1.5;
+	}
+	.shell {
+		display: flex;
+		height: 100vh;
+		min-height: 640px;
+	}
+	.sidebar {
+		width: 192px;
+		flex-shrink: 0;
+		background: var(--surface);
+		border-right: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		padding: 0;
+	}
+	.logo {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		padding: 18px 16px 16px;
+		border-bottom: 1px solid var(--border);
+	}
+	.logo-mark {
+		width: 26px;
+		height: 26px;
+		border-radius: 6px;
+		background: var(--green);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+	.logo-mark svg {
+		width: 14px;
+		height: 14px;
+		stroke: #0d0f0d;
+		fill: none;
+		stroke-width: 2.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.logo-name {
+		font-size: 13px;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		color: var(--text);
+	}
+	.nav {
+		padding: 8px 0;
+		flex: 1;
+	}
+	.nav-item {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		padding: 7px 14px;
+		font-size: 13px;
+		color: var(--muted);
+		cursor: pointer;
+		border-left: 2px solid transparent;
+		transition: color 0.1s;
+	}
+	.nav-item:hover {
+		color: var(--text);
+	}
+	.nav-item.active {
+		color: var(--text);
+		border-left-color: var(--green);
+		background: rgba(74, 222, 128, 0.05);
+	}
+	.nav-item svg {
+		width: 15px;
+		height: 15px;
+		stroke: currentColor;
+		fill: none;
+		stroke-width: 1.8;
+		flex-shrink: 0;
+	}
+	.sidebar-footer {
+		padding: 12px 14px;
+		border-top: 1px solid var(--border);
+		display: flex;
+		align-items: center;
+		gap: 9px;
+	}
+	.avatar {
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		background: var(--surface3);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--green);
+		flex-shrink: 0;
+		border: 1px solid var(--border2);
+	}
+	.avatar-info {
+		display: flex;
+		flex-direction: column;
+	}
+	.avatar-name {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--text);
+	}
+	.avatar-plan {
+		font-size: 10px;
+		color: var(--muted);
+	}
 
-.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10}
-.topbar-left{display:flex;align-items:center;gap:8px}
-.topbar-title{font-size:13px;font-weight:500;color:var(--text)}
-.topbar-sub{font-size:11px;color:var(--muted)}
-.topbar-actions{display:flex;align-items:center;gap:8px}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);transition:color 0.1s,border-color 0.1s}
-.btn:hover{color:var(--text);border-color:rgba(255,255,255,0.15)}
-.btn-primary{background:var(--green);color:#0d0f0d;border-color:transparent;font-weight:600}
-.btn-primary:hover{background:#22c55e}
-.btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+	.main {
+		flex: 1;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+	}
+	.topbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 12px 24px;
+		border-bottom: 1px solid var(--border);
+		background: var(--surface);
+		position: sticky;
+		top: 0;
+		z-index: 10;
+	}
+	.topbar-left {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.topbar-title {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--text);
+	}
+	.topbar-sub {
+		font-size: 11px;
+		color: var(--muted);
+	}
+	.topbar-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 12px;
+		border-radius: 7px;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		border: 1px solid var(--border2);
+		background: var(--surface2);
+		color: var(--muted);
+		transition:
+			color 0.1s,
+			border-color 0.1s;
+	}
+	.btn:hover {
+		color: var(--text);
+		border-color: rgba(255, 255, 255, 0.15);
+	}
+	.btn-primary {
+		background: var(--green);
+		color: #0d0f0d;
+		border-color: transparent;
+		font-weight: 600;
+	}
+	.btn-primary:hover {
+		background: #22c55e;
+	}
+	.btn svg {
+		width: 13px;
+		height: 13px;
+		stroke: currentColor;
+		fill: none;
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
 
-.content{padding:24px;flex:1}
-.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
-.page-title{font-size:20px;font-weight:600;letter-spacing:-0.02em;color:var(--text);margin-bottom:2px}
-.page-meta{font-size:12px;color:var(--muted);font-family:var(--mono)}
+	.content {
+		padding: 24px;
+		flex: 1;
+	}
+	.page-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		margin-bottom: 24px;
+	}
+	.page-title {
+		font-size: 20px;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		color: var(--text);
+		margin-bottom: 2px;
+	}
+	.page-meta {
+		font-size: 12px;
+		color: var(--muted);
+		font-family: var(--mono);
+	}
 
-.section-label{font-size:10px;font-weight:600;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+	.section-label {
+		font-size: 10px;
+		font-weight: 600;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		color: var(--muted);
+		margin-bottom: 10px;
+	}
 
-.alerts-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:24px}
-.alert-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color 0.15s}
-.alert-card:hover{border-color:var(--border2)}
-.alert-card.warning{border-left:2px solid var(--amber)}
-.alert-card.danger{border-left:2px solid var(--red)}
-.alert-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.alert-hive{font-size:13px;font-weight:500;color:var(--text)}
-.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:0.04em}
-.badge-warning{background:rgba(251,191,36,0.12);color:var(--amber)}
-.badge-danger{background:rgba(248,113,113,0.12);color:var(--red)}
-.alert-desc{font-size:12px;color:var(--muted);margin-bottom:8px}
-.strength-dots{display:flex;gap:3px;align-items:center}
-.dot{width:9px;height:9px;border-radius:50%;border:1px solid var(--subtle)}
-.dot.g{background:var(--green);border-color:var(--green)}
-.dot.a{background:var(--amber);border-color:var(--amber)}
-.dot.r{background:var(--red);border-color:var(--red)}
-.alert-date{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:6px}
+	.alerts-row {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 8px;
+		margin-bottom: 24px;
+	}
+	.alert-card {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 12px 14px;
+		cursor: pointer;
+		transition: border-color 0.15s;
+	}
+	.alert-card:hover {
+		border-color: var(--border2);
+	}
+	.alert-card.warning {
+		border-left: 2px solid var(--amber);
+	}
+	.alert-card.danger {
+		border-left: 2px solid var(--red);
+	}
+	.alert-top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 6px;
+	}
+	.alert-hive {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--text);
+	}
+	.badge {
+		font-size: 10px;
+		font-weight: 600;
+		padding: 2px 7px;
+		border-radius: 4px;
+		letter-spacing: 0.04em;
+	}
+	.badge-warning {
+		background: rgba(251, 191, 36, 0.12);
+		color: var(--amber);
+	}
+	.badge-danger {
+		background: rgba(248, 113, 113, 0.12);
+		color: var(--red);
+	}
+	.alert-desc {
+		font-size: 12px;
+		color: var(--muted);
+		margin-bottom: 8px;
+	}
+	.strength-dots {
+		display: flex;
+		gap: 3px;
+		align-items: center;
+	}
+	.dot {
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		border: 1px solid var(--subtle);
+	}
+	.dot.g {
+		background: var(--green);
+		border-color: var(--green);
+	}
+	.dot.a {
+		background: var(--amber);
+		border-color: var(--amber);
+	}
+	.dot.r {
+		background: var(--red);
+		border-color: var(--red);
+	}
+	.alert-date {
+		font-size: 10px;
+		color: var(--muted);
+		font-family: var(--mono);
+		margin-top: 6px;
+	}
 
-.apiary-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.apiary-name{font-size:16px;font-weight:600;letter-spacing:-0.01em}
-.apiary-loc{font-size:12px;color:var(--muted);margin-bottom:16px}
+	.apiary-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 6px;
+	}
+	.apiary-name {
+		font-size: 16px;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+	}
+	.apiary-loc {
+		font-size: 12px;
+		color: var(--muted);
+		margin-bottom: 16px;
+	}
 
-.hive-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.hive-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:border-color 0.15s;display:flex;flex-direction:column;gap:10px}
-.hive-card:hover{border-color:var(--border2)}
-.hive-card.warning{border-top:2px solid var(--amber)}
-.hive-card.danger{border-top:2px solid var(--red)}
-.hive-card-top{display:flex;align-items:flex-start;justify-content:space-between}
-.hive-num{font-size:22px;font-weight:600;font-family:var(--mono);letter-spacing:-0.03em;color:var(--text)}
-.status-dot{width:7px;height:7px;border-radius:50%;margin-top:6px;flex-shrink:0}
-.status-dot.ok{background:var(--green)}
-.status-dot.warn{background:var(--amber)}
-.status-dot.danger{background:var(--red)}
-.hive-queen{font-size:11px;color:var(--muted);margin-top:2px}
-.hive-queen.ok{color:var(--green)}
-.hive-queen.warn{color:var(--amber)}
-.hive-queen.red{color:var(--red)}
-.hive-footer{display:flex;flex-direction:column;gap:6px;margin-top:auto}
-.hive-date{font-size:10px;color:var(--muted);font-family:var(--mono)}
-.hive-actions{display:flex;gap:6px}
-.btn-xs{flex:1;padding:5px 0;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);text-align:center;transition:color 0.1s,border-color 0.1s}
-.btn-xs:hover{color:var(--text);border-color:rgba(255,255,255,0.15)}
-.btn-xs.primary{background:var(--green);color:#0d0f0d;border-color:transparent;font-weight:600}
-.btn-xs.primary:hover{background:#22c55e}
+	.hive-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 8px;
+	}
+	.hive-card {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 14px;
+		cursor: pointer;
+		transition: border-color 0.15s;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.hive-card:hover {
+		border-color: var(--border2);
+	}
+	.hive-card.warning {
+		border-top: 2px solid var(--amber);
+	}
+	.hive-card.danger {
+		border-top: 2px solid var(--red);
+	}
+	.hive-card-top {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+	}
+	.hive-num {
+		font-size: 22px;
+		font-weight: 600;
+		font-family: var(--mono);
+		letter-spacing: -0.03em;
+		color: var(--text);
+	}
+	.status-dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		margin-top: 6px;
+		flex-shrink: 0;
+	}
+	.status-dot.ok {
+		background: var(--green);
+	}
+	.status-dot.warn {
+		background: var(--amber);
+	}
+	.status-dot.danger {
+		background: var(--red);
+	}
+	.hive-queen {
+		font-size: 11px;
+		color: var(--muted);
+		margin-top: 2px;
+	}
+	.hive-queen.ok {
+		color: var(--green);
+	}
+	.hive-queen.warn {
+		color: var(--amber);
+	}
+	.hive-queen.red {
+		color: var(--red);
+	}
+	.hive-footer {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-top: auto;
+	}
+	.hive-date {
+		font-size: 10px;
+		color: var(--muted);
+		font-family: var(--mono);
+	}
+	.hive-actions {
+		display: flex;
+		gap: 6px;
+	}
+	.btn-xs {
+		flex: 1;
+		padding: 5px 0;
+		border-radius: 6px;
+		font-size: 11px;
+		font-weight: 500;
+		cursor: pointer;
+		border: 1px solid var(--border2);
+		background: transparent;
+		color: var(--muted);
+		text-align: center;
+		transition:
+			color 0.1s,
+			border-color 0.1s;
+	}
+	.btn-xs:hover {
+		color: var(--text);
+		border-color: rgba(255, 255, 255, 0.15);
+	}
+	.btn-xs.primary {
+		background: var(--green);
+		color: #0d0f0d;
+		border-color: transparent;
+		font-weight: 600;
+	}
+	.btn-xs.primary:hover {
+		background: #22c55e;
+	}
 </style>
 
 <div class="shell">
-  <div class="sidebar">
-    <div class="logo">
-      <div class="logo-mark">
-        <svg viewBox="0 0 14 14"><polygon points="7,1 10,5 13,5 10,8 11,12 7,10 3,12 4,8 1,5 4,5"/></svg>
-      </div>
-      <span class="logo-name">GetApiary</span>
-    </div>
-    <nav class="nav">
-      <div class="nav-item active">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        Dashboard
-      </div>
-      <div class="nav-item">
-        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Analityka
-      </div>
-      <div class="nav-item">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        Ustawienia
-      </div>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="avatar">RS</div>
-      <div class="avatar-info">
-        <span class="avatar-name">Radosław S.</span>
-        <span class="avatar-plan">Premium</span>
-      </div>
-    </div>
-  </div>
+	<div class="sidebar">
+		<div class="logo">
+			<div class="logo-mark">
+				<svg viewBox="0 0 14 14"><polygon points="7,1 10,5 13,5 10,8 11,12 7,10 3,12 4,8 1,5 4,5" /></svg>
+			</div>
+			<span class="logo-name">GetApiary</span>
+		</div>
+		<nav class="nav">
+			<div class="nav-item active">
+				<svg viewBox="0 0 24 24">
+					<rect
+						x="3"
+						y="3"
+						width="7"
+						height="7"
+						rx="1"
+					/>
+					<rect
+						x="14"
+						y="3"
+						width="7"
+						height="7"
+						rx="1"
+					/>
+					<rect
+						x="3"
+						y="14"
+						width="7"
+						height="7"
+						rx="1"
+					/>
+					<rect
+						x="14"
+						y="14"
+						width="7"
+						height="7"
+						rx="1"
+					/>
+				</svg>
+				Dashboard
+			</div>
+			<div class="nav-item">
+				<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+				Analityka
+			</div>
+			<div class="nav-item">
+				<svg viewBox="0 0 24 24">
+					<circle
+						cx="12"
+						cy="8"
+						r="4"
+					/>
+					<path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+				</svg>
+				Ustawienia
+			</div>
+		</nav>
+		<div class="sidebar-footer">
+			<div class="avatar">RS</div>
+			<div class="avatar-info">
+				<span class="avatar-name">Radosław S.</span>
+				<span class="avatar-plan">Premium</span>
+			</div>
+		</div>
+	</div>
 
-  <div class="main">
-    <div class="topbar">
-      <div class="topbar-left">
-        <span class="topbar-title">Pasieka Turawa</span>
-        <span class="topbar-sub">· Turawa, woj. opolskie</span>
-      </div>
-      <div class="topbar-actions">
-        <button class="btn">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Dodaj ul
-        </button>
-        <button class="btn btn-primary">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nowy przegląd
-        </button>
-      </div>
-    </div>
+	<div class="main">
+		<div class="topbar">
+			<div class="topbar-left">
+				<span class="topbar-title">Pasieka Turawa</span>
+				<span class="topbar-sub">· Turawa, woj. opolskie</span>
+			</div>
+			<div class="topbar-actions">
+				<button class="btn">
+					<svg viewBox="0 0 24 24">
+						<line
+							x1="12"
+							y1="5"
+							x2="12"
+							y2="19"
+						/>
+						<line
+							x1="5"
+							y1="12"
+							x2="19"
+							y2="12"
+						/>
+					</svg>
+					Dodaj ul
+				</button>
+				<button class="btn btn-primary">
+					<svg viewBox="0 0 24 24">
+						<line
+							x1="12"
+							y1="5"
+							x2="12"
+							y2="19"
+						/>
+						<line
+							x1="5"
+							y1="12"
+							x2="19"
+							y2="12"
+						/>
+					</svg>
+					Nowy przegląd
+				</button>
+			</div>
+		</div>
 
-    <div class="content">
+		<div class="content">
+			<div class="page-header">
+				<div>
+					<div class="page-title">Dzień dobry, Radek</div>
+					<div class="page-meta">8 uli · ostatni przegląd 10 cze 2026 · 2 wymagają uwagi</div>
+				</div>
+			</div>
 
-      <div class="page-header">
-        <div>
-          <div class="page-title">Dzień dobry, Radek</div>
-          <div class="page-meta">8 uli · ostatni przegląd 10 cze 2026 · 2 wymagają uwagi</div>
-        </div>
-      </div>
+			<div class="section-label">Wymagają uwagi</div>
+			<div class="alerts-row">
+				<div class="alert-card warning">
+					<div class="alert-top">
+						<span class="alert-hive">Ul 3</span>
+						<span class="badge badge-warning">Uwaga</span>
+					</div>
+					<div class="alert-desc">Matka niewidziana, czerw OK</div>
+					<div class="strength-dots">
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="alert-date">8 cze 2026</div>
+				</div>
+				<div class="alert-card danger">
+					<div class="alert-top">
+						<span class="alert-hive">Ul 4</span>
+						<span class="badge badge-danger">Alarm</span>
+					</div>
+					<div class="alert-desc">Brak matki · mateczniki rojowe</div>
+					<div class="strength-dots">
+						<div class="dot r"></div>
+						<div class="dot r"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="alert-date">29 maj 2026</div>
+				</div>
+				<div class="alert-card warning">
+					<div class="alert-top">
+						<span class="alert-hive">Ul 8</span>
+						<span class="badge badge-warning">Uwaga</span>
+					</div>
+					<div class="alert-desc">Przegląd przeterminowany · 26 dni</div>
+					<div class="strength-dots">
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="alert-date">2 cze 2026</div>
+				</div>
+			</div>
 
-      <div class="section-label">Wymagają uwagi</div>
-      <div class="alerts-row">
-        <div class="alert-card warning">
-          <div class="alert-top">
-            <span class="alert-hive">Ul 3</span>
-            <span class="badge badge-warning">Uwaga</span>
-          </div>
-          <div class="alert-desc">Matka niewidziana, czerw OK</div>
-          <div class="strength-dots">
-            <div class="dot a"></div><div class="dot a"></div><div class="dot a"></div><div class="dot"></div><div class="dot"></div>
-          </div>
-          <div class="alert-date">8 cze 2026</div>
-        </div>
-        <div class="alert-card danger">
-          <div class="alert-top">
-            <span class="alert-hive">Ul 4</span>
-            <span class="badge badge-danger">Alarm</span>
-          </div>
-          <div class="alert-desc">Brak matki · mateczniki rojowe</div>
-          <div class="strength-dots">
-            <div class="dot r"></div><div class="dot r"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
-          </div>
-          <div class="alert-date">29 maj 2026</div>
-        </div>
-        <div class="alert-card warning">
-          <div class="alert-top">
-            <span class="alert-hive">Ul 8</span>
-            <span class="badge badge-warning">Uwaga</span>
-          </div>
-          <div class="alert-desc">Przegląd przeterminowany · 26 dni</div>
-          <div class="strength-dots">
-            <div class="dot a"></div><div class="dot a"></div><div class="dot a"></div><div class="dot"></div><div class="dot"></div>
-          </div>
-          <div class="alert-date">2 cze 2026</div>
-        </div>
-      </div>
+			<div class="apiary-header">
+				<span class="section-label">Ule</span>
+			</div>
+			<div class="apiary-loc">8 uli wielkopolskich</div>
 
-      <div class="apiary-header">
-        <span class="section-label">Ule</span>
-      </div>
-      <div class="apiary-loc">8 uli wielkopolskich</div>
+			<div class="hive-grid">
+				<div class="hive-card">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">1</div>
+							<div class="hive-queen ok">Matka widziana</div>
+						</div>
+						<div class="status-dot ok"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">10 cze 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
 
-      <div class="hive-grid">
+				<div class="hive-card">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">2</div>
+							<div class="hive-queen ok">Matka widziana</div>
+						</div>
+						<div class="status-dot ok"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">10 cze 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
 
-        <div class="hive-card">
-          <div class="hive-card-top">
-            <div><div class="hive-num">1</div><div class="hive-queen ok">Matka widziana</div></div>
-            <div class="status-dot ok"></div>
-          </div>
-          <div class="strength-dots"><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">10 cze 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
+				<div class="hive-card warning">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">3</div>
+							<div class="hive-queen warn">Niewidziana, OK</div>
+						</div>
+						<div class="status-dot warn"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">8 cze 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
 
-        <div class="hive-card">
-          <div class="hive-card-top">
-            <div><div class="hive-num">2</div><div class="hive-queen ok">Matka widziana</div></div>
-            <div class="status-dot ok"></div>
-          </div>
-          <div class="strength-dots"><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">10 cze 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
+				<div class="hive-card danger">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">4</div>
+							<div class="hive-queen red">Brak matki</div>
+						</div>
+						<div class="status-dot danger"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot r"></div>
+						<div class="dot r"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">29 maj 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
 
-        <div class="hive-card warning">
-          <div class="hive-card-top">
-            <div><div class="hive-num">3</div><div class="hive-queen warn">Niewidziana, OK</div></div>
-            <div class="status-dot warn"></div>
-          </div>
-          <div class="strength-dots"><div class="dot a"></div><div class="dot a"></div><div class="dot a"></div><div class="dot"></div><div class="dot"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">8 cze 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
+				<div class="hive-card">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">5</div>
+							<div class="hive-queen ok">Matka widziana</div>
+						</div>
+						<div class="status-dot ok"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">10 cze 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
 
-        <div class="hive-card danger">
-          <div class="hive-card-top">
-            <div><div class="hive-num">4</div><div class="hive-queen red">Brak matki</div></div>
-            <div class="status-dot danger"></div>
-          </div>
-          <div class="strength-dots"><div class="dot r"></div><div class="dot r"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">29 maj 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
+				<div class="hive-card">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">6</div>
+							<div class="hive-queen ok">Matka widziana</div>
+						</div>
+						<div class="status-dot ok"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">10 cze 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
 
-        <div class="hive-card">
-          <div class="hive-card-top">
-            <div><div class="hive-num">5</div><div class="hive-queen ok">Matka widziana</div></div>
-            <div class="status-dot ok"></div>
-          </div>
-          <div class="strength-dots"><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">10 cze 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
+				<div class="hive-card">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">7</div>
+							<div class="hive-queen ok">Matka widziana</div>
+						</div>
+						<div class="status-dot ok"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+						<div class="dot g"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">9 cze 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
 
-        <div class="hive-card">
-          <div class="hive-card-top">
-            <div><div class="hive-num">6</div><div class="hive-queen ok">Matka widziana</div></div>
-            <div class="status-dot ok"></div>
-          </div>
-          <div class="strength-dots"><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">10 cze 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="hive-card">
-          <div class="hive-card-top">
-            <div><div class="hive-num">7</div><div class="hive-queen ok">Matka widziana</div></div>
-            <div class="status-dot ok"></div>
-          </div>
-          <div class="strength-dots"><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div><div class="dot g"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">9 cze 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="hive-card warning">
-          <div class="hive-card-top">
-            <div><div class="hive-num">8</div><div class="hive-queen warn">Niewidziana, OK</div></div>
-            <div class="status-dot warn"></div>
-          </div>
-          <div class="strength-dots"><div class="dot a"></div><div class="dot a"></div><div class="dot a"></div><div class="dot"></div><div class="dot"></div></div>
-          <div class="hive-footer">
-            <div class="hive-date">2 cze 2026</div>
-            <div class="hive-actions">
-              <button class="btn-xs">Szczegóły</button>
-              <button class="btn-xs primary">Przegląd</button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
+				<div class="hive-card warning">
+					<div class="hive-card-top">
+						<div>
+							<div class="hive-num">8</div>
+							<div class="hive-queen warn">Niewidziana, OK</div>
+						</div>
+						<div class="status-dot warn"></div>
+					</div>
+					<div class="strength-dots">
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot a"></div>
+						<div class="dot"></div>
+						<div class="dot"></div>
+					</div>
+					<div class="hive-footer">
+						<div class="hive-date">2 cze 2026</div>
+						<div class="hive-actions">
+							<button class="btn-xs">Szczegóły</button>
+							<button class="btn-xs primary">Przegląd</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
