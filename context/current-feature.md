@@ -1,41 +1,16 @@
-# Current Feature: Demo User Seed Script
+# Current Feature
 
 ## Status
 
-In Progress — implemented and verified on `feat/demo-user-seed`, awaiting `/feature review`
+Not Started
 
 ## Goals
 
-- `prisma/seed.ts` creates a complete demo account in one transaction: user `demo@getapiary.app` / `Jan Pszczelarz` with a bcrypt hash of `demo1234` (10 salt rounds).
-- Related records follow FK order — `Subscription` (`PREMIUM`, `active`, all Stripe fields null), `UsagePeriod` for the current month (`pdfGenerationsUsed: 3`, `aiReportsUsed: 1`), `Apiary` (`Pasieka Turawa`, `Turawa, woj. opolskie`), and five `WIELKOPOLSKI` hives labelled `Ul 1`–`Ul 5` with `currentInspectionId` left null.
-- Idempotent: an existence check on the email short-circuits with `[seed] Demo user already exists — skipping.` No `upsert` — a partial seed must not leave an orphaned user row.
-- `periodStart` derived at runtime via `new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))`, never hardcoded.
-- Progress logged to stdout in the order given by the spec, ending in `[seed] Done.`
-- `prisma db seed` runs the script.
-- No `Inspection`, `PdfGenerationJob`, or `AiReport` records — those belong to a later spec.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-Spec: [context/features/user-seed-spec.md](context/features/user-seed-spec.md)
-
-**Gaps between the spec and the repo, to settle during `start`:**
-
-- **`bcryptjs` is not installed.** The spec says it is "already in deps"; [package.json](package.json) has no `bcryptjs` and no `@types/bcryptjs`. Both need adding as devDependencies (seed-only).
-- **`tsx` is not installed either**, and the spec's seed command (`tsx prisma/seed.ts`) depends on it.
-- **Seed config location is Prisma 7, not the `package.json` `"prisma"` key.** The spec's `package.json` snippet is the pre-v7 pattern; v7 moves it into `migrations.seed` in [prisma.config.ts](prisma.config.ts), which this repo already has.
-- **Import path differs.** The spec writes `from '../generated/prisma'`; the generated client actually lives at `@/generated/prisma/client` ([app/lib/prisma.ts:3](app/lib/prisma.ts#L3)). The seed runs outside Next.js, so it also needs its own `PrismaClient` built on the `PrismaPg` adapter with `DATABASE_URL` — the app singleton is not directly reusable from a CLI script.
-- **`$transaction([...])` array form can't emit the spec's step-by-step logs**, since every promise is dispatched before any resolves. Use the interactive form, `$transaction(async (tx) => …)`, to keep both the ordering and the log lines.
-- Schema constraints already agree with the spec: `Apiary.userId` and `Subscription.userId` are `@unique` (one apiary and one subscription per user), and `UsagePeriod` is `@@unique([userId, periodStart])`.
-- Target is the Neon **development** branch, matching the Prisma setup phase.
-
-**How each gap was resolved during `start`:**
-
-- Installed `bcryptjs@3.0.3` and `tsx@4.23.12` as devDependencies. **No `@types/bcryptjs`** — v3 ships its own declarations, and the DefinitelyTyped package is stale v2 defs that would shadow them.
-- Seed command lives in `migrations.seed` in [prisma.config.ts](prisma.config.ts), not the `package.json` `"prisma"` key. Added `db:seed` npm script.
-- Seed imports `./generated/prisma/client` relatively rather than through the `@` alias, and builds its own `PrismaClient` on `PrismaPg` with `max: 1` — the schema declares no datasource `url`, so an adapter is mandatory even outside Next.js.
-- Used the interactive `$transaction(async (tx) => …)` with `{ maxWait: 10_000, timeout: 20_000 }`; the 2s/5s defaults are too tight for a cold Neon compute.
-- Replaced the spec's `process.exit(1)` in `.catch` with `process.exitCode = 1` — `process.exit` terminates before `.finally` can run `$disconnect()`.
-- Hives created with one `createMany` rather than five `create` calls.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -67,3 +42,27 @@ Phase 1 database foundation. Prisma 7.10.0 (pinned exact) wired to Neon Postgres
 **Left open:** `DATABASE_URL` for the Neon **production** branch still needs adding to the Vercel project settings before the first deploy.
 
 **Follow-ups noted, not done:** `context/coding-standards.md` still carries a stale Sanity/monorepo section and assumes a `src/` directory this repo doesn't have.
+
+### Demo User Seed Script — completed 2026-08-28
+
+Idempotent `prisma db seed` that stands up a full demo account. Merged to `main` as `2f7f687` (feature commit `5e8db37`).
+
+**Delivered**
+
+- `prisma/seed.ts` — `demo@getapiary.app` / Jan Pszczelarz (bcrypt of `demo1234`, 10 rounds), `PREMIUM` + `active` subscription with all Stripe fields null, current-month `UsagePeriod` (3 PDFs / 1 AI report), `Pasieka Turawa` apiary, and five `WIELKOPOLSKI` hives `Ul 1`–`Ul 5`. All five steps in one interactive transaction, each logging a `[seed] …` line.
+- `prisma.config.ts` — `migrations.seed: 'tsx prisma/seed.ts'`.
+- `package.json` — `db:seed` script; `bcryptjs@3.0.3` and `tsx@4.23.12` added as devDependencies.
+
+**Decisions worth remembering**
+
+- **`migrations.seed` in `prisma.config.ts`, not the `package.json` `"prisma"` key.** The v7 location; the old key is silently ignored.
+- **No `@types/bcryptjs`.** `bcryptjs@3` ships its own declarations. The DefinitelyTyped package is stale v2 defs that shadow them — installed it, then removed it.
+- **Interactive `$transaction(async (tx) => …)`, not the array form.** The array form dispatches every promise before any resolves, so ordered per-step logging is impossible with it. Timeouts raised to `{ maxWait: 10_000, timeout: 20_000 }` — the 2s/5s defaults are too tight for a cold Neon compute.
+- **`process.exitCode = 1`, never `process.exit(1)` in the `.catch`.** `process.exit` terminates before `.finally` can run `$disconnect()`, leaking a connection on every failed seed. (The spec's own snippet had this bug.)
+- **The seed builds its own `PrismaClient` on `PrismaPg` with `max: 1`** and imports `./generated/prisma/client` relatively. The app singleton in `app/lib/prisma.ts` isn't reusable from a CLI process, and since the schema declares no datasource `url`, an adapter is mandatory even outside Next.js.
+- **Seed loads `.env.local` itself via dotenv.** `prisma db seed` inherits env from the CLI process, but `tsx prisma/seed.ts` run directly does not.
+- **Existence check, not `upsert`** — a partial seed must never leave a user row without its related records.
+
+**Verified** against the live Neon **development** branch (`br-old-bonus-b1yjip8c`): first run printed the spec's expected stdout (`periodStart` → `2026-08-01`), second run printed only the skip line; SQL confirmed 1/1/1/1/5 rows with no duplicates, correct enum and null-Stripe values, all `currentInspectionId` null, and 0 inspections / PDF jobs / AI reports; a throwaway probe confirmed `bcrypt.compare('demo1234')` → true, wrong password → false, and that a deliberate mid-transaction throw left zero rows. `tsc --noEmit`, `eslint`, `vitest run` (199 tests) and `next build` all green.
+
+**Left open:** `periodStart` uses the spec's literal `now.getFullYear()` / `now.getMonth()` (local getters) inside `Date.UTC`. In UTC+2, seeding between 00:00 and 02:00 local on the 1st yields the new month while `now` is still the previous month in UTC. Harmless for a demo seed; switch to `getUTCFullYear`/`getUTCMonth` if this ever backs real usage-quota logic.
