@@ -1,16 +1,39 @@
-# Current Feature
+# Current Feature: Auth Phase 2 — Credentials (Email/Password) Provider
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- Credentials provider added to the Auth.js setup so users can sign in with email + password alongside the existing Google OAuth.
+- `auth.config.ts` declares the Credentials provider with an `authorize: () => null` placeholder (no Prisma, no bcrypt — stays Proxy-safe).
+- `auth.ts` overrides that provider with the real `authorize`: look the user up by email, reject when `passwordHash` is null, verify with `bcrypt.compare`, return the user or `null`.
+- `POST /api/auth/register` accepts `{ name, email, password, confirmPassword }`, validates that the passwords match, rejects an already-registered email, hashes with bcryptjs, creates the `User`, and returns a JSON success/error response.
+- `User.passwordHash` supports credentials users (already nullable since the Phase 1 migration — a new migration only if something is genuinely missing).
+- Verified end to end: register via curl → sign in at `/api/auth/signin` with the new account → redirected to `/dashboard`; the seeded `demo@getapiary.app` / `demo1234` account also signs in; Google OAuth still works.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+**Source spec:** `context/features/auth-phase-2-spec.md`. Builds directly on Auth Phase 1 (see History) — re-read those decisions before touching `auth.ts` / `auth.config.ts`.
+
+**Spec corrections to carry into the work:**
+
+- The spec's testing step 5 says "Verify GitHub OAuth still works" — this project ships **Google**, not GitHub. Phase 1 switched providers by user decision.
+- "Add password field to User model via migration if not already there" — it **is** already there. `User.passwordHash` exists and was made nullable by `20260828201002_auth_user_oauth_fields`. Expect no schema change; if one does become necessary, run `npx prisma generate` explicitly afterwards (Phase 1: `prisma migrate dev` silently left a stale client, and no gate caught it).
+- Spec paths are unprefixed/`src/`-style; this repo has no `src/`. `auth.ts` and `auth.config.ts` live at the repo root, routes under `app/api/`.
+
+**Constraints carried from Phase 1:**
+
+- JWT session strategy — the Prisma adapter does not issue database `Session` rows, and **Credentials only works with JWT sessions**. Don't switch strategies.
+- `callbacks.authorized` in `auth.config.ts` is what actually protects `/dashboard/*`; `...authConfig.callbacks` must stay spread inside `auth.ts`'s `callbacks` object or it is silently dropped.
+- `bcryptjs@3.0.3` is already a devDependency (used by `prisma/seed.ts`, 10 rounds, ships its own types — do **not** add `@types/bcryptjs`). It will now be imported by app code, so it likely needs to move to `dependencies`.
+- The seeded demo user's `passwordHash` is bcrypt of `demo1234` — a ready-made fixture for the sign-in test.
+- `allowDangerousEmailAccountLinking: true` on Google is already set so a credentials account created here can later be linked to the same Google email.
+
+**Gotcha found during implementation — a new `'use server'` module is not picked up by a running dev server.** Adding `app/lib/auth-actions.ts` while `next dev` was already running left the action unregistered on the server while the client happily sent its `$ACTION_ID`, so the sign-out form failed with `Cannot read properties of undefined (reading 'apply')` pointing at `<Sidebar />`. Nothing wrong with the code — a fresh server runs the same action in 10ms. Same family as Dashboard Spec 1's `@theme` lesson: **restart `next dev` after adding a server action or a new `@theme` key.** Related: two `next dev` processes on this project share one `.next` directory and will corrupt each other's state; run only one.
+
+**Open questions to settle during implementation:** whether registration should sign the user in automatically or bounce to the sign-in page; whether to validate the payload with Zod or hand-rolled checks; and whether error responses should distinguish "email taken" from a generic failure (enumeration trade-off).
 
 ## History
 
