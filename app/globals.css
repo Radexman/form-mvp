@@ -1,19 +1,24 @@
 @import 'tailwindcss';
 
 :root {
-	--background: #0f1710;
-	--surface: #1c2b1e;
-	--surface-2: #243528;
-	--surface-3: #2d4232;
+	--background: #0d0f0d;
+	--surface: #141814;
+	--surface-2: #1a1f1a;
+	--surface-3: #202620;
 	--accent: #4ade80;
+	--accent-hover: #22c55e; /* the one step darker green every primary button hovers to */
 	--accent-dim: #16a34a;
-	--accent-warm: #fcd34d;
+	--accent-warm: #fbbf24;
 	--danger: #f87171;
 	--danger-dim: #991b1b;
-	--foreground: #f0fdf4;
-	--muted: #86efac;
-	--subtle: #4b7a57;
-	--border: #2d4232;
+	--foreground: #e8f0e8;
+	--muted: #6b7d6b;
+	--subtle: #3a4a3a;
+	/* Borders are white at low alpha rather than opaque greys, so a card reads the
+	   same hairline whether it sits on --surface or on the darker --background. */
+	--border: rgba(255, 255, 255, 0.06);
+	--border-2: rgba(255, 255, 255, 0.1); /* resting hairline, one step up: card hover */
+	--border-3: rgba(255, 255, 255, 0.15); /* interactive hover: buttons */
 	/* Frame composition. Kept far enough apart in both hue and lightness to stay
 	   separable in the ten-cell fill bar: brood is the dull dark one, honey the
 	   bright one, pollen the saturated mid. */
@@ -31,6 +36,7 @@
 	--color-surface-3: var(--surface-3);
 	/* accent */
 	--color-accent: var(--accent);
+	--color-accent-hover: var(--accent-hover);
 	--color-accent-dim: var(--accent-dim);
 	--color-accent-warm: var(--accent-warm);
 	/* status */
@@ -41,6 +47,8 @@
 	--color-muted: var(--muted);
 	--color-subtle: var(--subtle);
 	--color-border: var(--border);
+	--color-border-2: var(--border-2);
+	--color-border-3: var(--border-3);
 	/* frame composition */
 	--color-comb-brood: var(--comb-brood);
 	--color-comb-honey: var(--comb-honey);

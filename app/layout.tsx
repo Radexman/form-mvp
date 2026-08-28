@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { DM_Sans, DM_Mono } from 'next/font/google';
 import './globals.css';
 
@@ -15,8 +15,15 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-	title: 'MVP Form',
+	title: 'Hivewise',
 	description: 'Multi step inspection form',
+};
+
+export const viewport: Viewport = {
+	// Lets the dashboard's bottom tab bar pad itself past the iOS home indicator:
+	// without `cover`, env(safe-area-inset-*) resolves to 0.
+	viewportFit: 'cover',
+	themeColor: '#0d0f0d',
 };
 
 export default function RootLayout({
