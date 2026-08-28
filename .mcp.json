@@ -1,0 +1,27 @@
+{
+	"mcpServers": {
+		"prisma": {
+			"type": "http",
+			"url": "https://mcp.prisma.io/mcp"
+		},
+		"neon": {
+			"type": "http",
+			"url": "https://mcp.neon.tech/mcp"
+		},
+		"playwright": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": ["/c", "npx", "@playwright/mcp@latest"]
+		},
+		"ark-ui": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": ["/c", "npx", "-y", "@ark-ui/mcp"]
+		},
+		"context7": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+		}
+	}
+}
