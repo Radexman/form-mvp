@@ -8,12 +8,23 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id String @id @default(cuid())
+
+  // Auth.js writes these four through `@auth/prisma-adapter`. `email` stays
+  // non-null (the rest of the app assumes an address) — safe because Google
+  // always returns a verified email, unlike providers that let users hide one.
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+
+  // Nullable: an OAuth-only user never has a password, and `createUser` does
+  // not supply one. Credentials sign-in (Auth Phase 2) fills it for the users
+  // that register with an email and password.
+  passwordHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   apiary       Apiary?
   subscription Subscription?
