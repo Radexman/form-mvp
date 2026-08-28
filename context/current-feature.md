@@ -1,39 +1,16 @@
-# Current Feature: Auth Phase 2 — Credentials (Email/Password) Provider
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Credentials provider added to the Auth.js setup so users can sign in with email + password alongside the existing Google OAuth.
-- `auth.config.ts` declares the Credentials provider with an `authorize: () => null` placeholder (no Prisma, no bcrypt — stays Proxy-safe).
-- `auth.ts` overrides that provider with the real `authorize`: look the user up by email, reject when `passwordHash` is null, verify with `bcrypt.compare`, return the user or `null`.
-- `POST /api/auth/register` accepts `{ name, email, password, confirmPassword }`, validates that the passwords match, rejects an already-registered email, hashes with bcryptjs, creates the `User`, and returns a JSON success/error response.
-- `User.passwordHash` supports credentials users (already nullable since the Phase 1 migration — a new migration only if something is genuinely missing).
-- Verified end to end: register via curl → sign in at `/api/auth/signin` with the new account → redirected to `/dashboard`; the seeded `demo@getapiary.app` / `demo1234` account also signs in; Google OAuth still works.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-**Source spec:** `context/features/auth-phase-2-spec.md`. Builds directly on Auth Phase 1 (see History) — re-read those decisions before touching `auth.ts` / `auth.config.ts`.
-
-**Spec corrections to carry into the work:**
-
-- The spec's testing step 5 says "Verify GitHub OAuth still works" — this project ships **Google**, not GitHub. Phase 1 switched providers by user decision.
-- "Add password field to User model via migration if not already there" — it **is** already there. `User.passwordHash` exists and was made nullable by `20260828201002_auth_user_oauth_fields`. Expect no schema change; if one does become necessary, run `npx prisma generate` explicitly afterwards (Phase 1: `prisma migrate dev` silently left a stale client, and no gate caught it).
-- Spec paths are unprefixed/`src/`-style; this repo has no `src/`. `auth.ts` and `auth.config.ts` live at the repo root, routes under `app/api/`.
-
-**Constraints carried from Phase 1:**
-
-- JWT session strategy — the Prisma adapter does not issue database `Session` rows, and **Credentials only works with JWT sessions**. Don't switch strategies.
-- `callbacks.authorized` in `auth.config.ts` is what actually protects `/dashboard/*`; `...authConfig.callbacks` must stay spread inside `auth.ts`'s `callbacks` object or it is silently dropped.
-- `bcryptjs@3.0.3` is already a devDependency (used by `prisma/seed.ts`, 10 rounds, ships its own types — do **not** add `@types/bcryptjs`). It will now be imported by app code, so it likely needs to move to `dependencies`.
-- The seeded demo user's `passwordHash` is bcrypt of `demo1234` — a ready-made fixture for the sign-in test.
-- `allowDangerousEmailAccountLinking: true` on Google is already set so a credentials account created here can later be linked to the same Google email.
-
-**Gotcha found during implementation — a new `'use server'` module is not picked up by a running dev server.** Adding `app/lib/auth-actions.ts` while `next dev` was already running left the action unregistered on the server while the client happily sent its `$ACTION_ID`, so the sign-out form failed with `Cannot read properties of undefined (reading 'apply')` pointing at `<Sidebar />`. Nothing wrong with the code — a fresh server runs the same action in 10ms. Same family as Dashboard Spec 1's `@theme` lesson: **restart `next dev` after adding a server action or a new `@theme` key.** Related: two `next dev` processes on this project share one `.next` directory and will corrupt each other's state; run only one.
-
-**Open questions to settle during implementation:** whether registration should sign the user in automatically or bounce to the sign-in page; whether to validate the payload with Zod or hand-rolled checks; and whether error responses should distinguish "email taken" from a generic failure (enumeration trade-off).
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -146,3 +123,36 @@ Auth.js v5 with the Prisma adapter, JWT sessions, and Google OAuth protecting `/
 **Verified** end to end against the Neon **development** branch: Google consent created `borderlandsmaniak@gmail.com` with `image` set and `passwordHash` null, linked one `google` / `oidc` `Account` with an `access_token` and no refresh token, wrote **zero** `Session` rows (confirming the JWT strategy), and left the seeded demo user and its apiary untouched. Signed out, `/dashboard` 307s to `/api/auth/signin?callbackUrl=…` while `/` and `/api/generate-pdf` stay public. The client ID and redirect URI were also validated directly against Google's authorize endpoint. `tsc --noEmit`, `eslint`, `prettier`, `vitest run` (199 tests) and `next build` all green.
 
 **Left open:** a fresh Google user has no apiary, so once Dashboard Spec 2 lands they hit its `apiary === null` → `/onboarding` redirect, and that route does not exist. Accepted deliberately: only the demo user shows seeded data for now. Until Spec 2, `/dashboard` renders Spec 1's static mock for any signed-in user, so Phase 1's happy path is clean. `AUTH_SECRET` and the two Google values are in `.env.local` only; Vercel still needs them, plus a production redirect URI on the OAuth client. The consent screen is in **Testing** status — only listed test users can sign in. No sign-out UI yet (Phase 3). `emailVerified` stays null: the Prisma adapter only sets it for email-link flows, not OAuth.
+
+### Auth Phase 2 — Credentials (Email/Password) Provider — completed 2026-08-28
+
+Email/password sign-in alongside Google OAuth, the registration endpoint behind it, and a sidebar sign-out button. Merged to `main` as `dcf9c47` (feature commit `2a3f819`).
+
+**Delivered**
+
+- `app/lib/auth.schema.ts` — `signInSchema` / `registerSchema` with Polish messages, shared by the route handler and the `authorize` callback so both sides of the wire enforce one set of rules.
+- `auth.config.ts` — Credentials placeholder (`authorize: () => null`); `googleProvider` exported so `auth.ts` reuses it by reference instead of redeclaring its options.
+- `auth.ts` — the real `authorize`: Prisma lookup, `bcrypt.compare`, `null` on every failure path.
+- `app/api/auth/register/route.ts` — `POST /api/auth/register`.
+- `app/lib/auth-actions.ts` + `Sidebar` — `signOutAction` in a `<form>` at the sidebar footer, with a `SignOutIcon` added to `icons.tsx`. Added on user request mid-feature; Phase 3 folds it into the avatar dropdown.
+- `package.json` — `bcryptjs` moved from devDependencies to dependencies.
+
+**No migration.** `User.passwordHash` was already nullable from `20260828201002_auth_user_oauth_fields`, exactly as the load notes predicted.
+
+**Decisions worth remembering**
+
+- **A new `'use server'` module is not picked up by a running `next dev`.** The action goes unregistered on the server while the client renders and posts its `$ACTION_ID`, so sign-out died with `Cannot read properties of undefined (reading 'apply')` pointed at `<Sidebar />` — a null-looking error with nothing wrong in the code. A fresh server ran the same action in 10ms. **Restart the dev server after adding a server action.** Direct sibling of Spec 1's `@theme` lesson.
+- **Never run two `next dev` processes on this project.** They share one `.next` directory and corrupt each other. Clearing `.next/dev` under a live server is what turned the staleness above into a hard failure.
+- **Email is normalised *before* it is validated** — `z.string().trim().toLowerCase().pipe(z.email(…))`. Zod v4 runs the format check ahead of chained transforms, so `z.email().trim()` rejects a pasted address with a trailing space. The lowercasing is not cosmetic: `User.email` is `@unique` and Postgres compares case-sensitively, so without it `Jan@…` and `jan@…` are two rows and whoever capitalised at registration could never sign in.
+- **`providers` is overwritten after `...authConfig`, deliberately** — the opposite of `callbacks`, where overwriting silently drops `authorized`. The placeholder in `auth.config.ts` can never sign anyone in, which is harmless because `config.matcher` never routes `/api/auth/*` through Proxy.
+- **`authorize` returns `null`, never throws.** A throw surfaces as `CallbackRouteError` (a server fault); `null` gives one `CredentialsSignin` for every failure, so an unknown address, an OAuth-only account and a wrong password are indistinguishable. It also returns named fields rather than the row, so `passwordHash` cannot reach the JWT.
+- **Registration 409s on a taken address instead of setting a password on the existing row.** Doing the latter would hand a Google user's account to anyone who knows their email. Linking only runs the other way, via `allowDangerousEmailAccountLinking` on a verified Google sign-in.
+- **The 409 leaks account existence, accepted knowingly.** A register endpoint cannot both create the account and hide the collision, and a vague error strands someone who forgot they had signed up. Sign-in stays generic. `P2002` is caught for the race the existence check cannot close.
+- **No auto-sign-in after registration** — Phase 3's spec says redirect to sign-in, and minting a session from a plain route handler would bypass Auth.js's own callbacks.
+- **Zod, matching the eight existing `*.schema.ts` files**, with `z.flattenError` giving Phase 3's form field-keyed messages.
+- **`/api/auth/register` resolves ahead of `[...nextauth]`** — the App Router matches static segments before a catch-all. Confirmed in the build output, where both appear as separate routes.
+- **Sign-out is a server action in a `<form>`, not an `onClick`** — `auth.ts` pulls in Prisma, so a client component may only hold a reference to the action, and a GET that destroys a session is a CSRF hazard.
+
+**Verified** against the Neon **development** branch: registration normalised `  TEST@Test.com ` to `test@test.com` and stored a `$2b$10$` hash at cost 10 (matching the seed), then answered 409 duplicate, 409 against the Google account, 400 field errors, 400 malformed JSON and 405 on GET. Sign-in reached `/dashboard` for both the seeded demo account and a new registration, including with an uppercased address; wrong password, unknown address and the `passwordHash`-null Google account all failed identically as `CredentialsSignin`. Zero `Session` rows, one Google `Account`, seed untouched. In the browser at 1440×900: signed in through the form, clicked sign-out → `POST /dashboard 303` → `signOutAction()` in 10ms → `/`, and `/dashboard` bounced back to sign-in. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (199 tests) and `next build` all green.
+
+**Left open:** **no tests were written** — `/feature test` was skipped, so `auth.schema.ts` (the email pipe, the byte-length rule, the confirm-password refinement) and the register handler's branches have no unit coverage despite being the most testable code in the feature. Everything above was verified by hand instead. Registration is still curl-only — no `/register` or `/sign-in` page until Phase 3, so a new user has to sign in through next-auth's default page. That page also warns about missing `autocomplete` attributes; Phase 3 replaces it. Sign-out is desktop-only, since the sidebar footer has no mobile equivalent. Password rules are minimum 8 characters and at most 72 bytes (bcrypt's silent truncation point) with no complexity requirement. No rate limiting on either the register route or credentials sign-in — the obvious next hardening step. Timing still distinguishes a known address from an unknown one, since bcrypt only runs when a hash exists; the 409 already leaks the same fact, so closing one without the other buys nothing.
