@@ -28,6 +28,16 @@ const QUEEN_LABEL_COLOR: Record<QueenStatus, string> = {
 };
 
 /**
+ * A hive with no inspection has no queen state to report — that is the absence
+ * of a reading, not a fourth `QueenStatus`. Both the label and the status dot
+ * go muted so an uninspected hive cannot be mistaken for a healthy one, which
+ * a green 'ok' dot would do.
+ */
+const NO_INSPECTION_LABEL = 'Brak przeglądów';
+const NO_INSPECTION_COLOR = 'text-muted';
+const NO_INSPECTION_DOT = 'bg-subtle';
+
+/**
  * Sized for a gloved thumb outdoors, then relaxed to the mock's compact 11px
  * row at `lg`. "Przegląd" is the action this whole screen exists to launch, so
  * it gets 48px to "Szczegóły"'s 44 and sits lowest — nearest the thumb.
@@ -39,28 +49,36 @@ const BTN_GHOST =
 const BTN_PRIMARY = 'min-h-12 border-transparent bg-accent font-semibold text-background hover:bg-accent-hover';
 
 export interface HiveCardProps {
-	number: number;
-	queenStatus: QueenStatus;
-	/** 1–5. */
+	/** The hive's own label, e.g. "Ul 1" — user data, rendered as written. */
+	label: string;
+	/** `null` when the hive has never been inspected. */
+	queenStatus: QueenStatus | null;
+	/** 0–5. 0 renders as five empty dots. */
 	strength: number;
 	lastInspection: string;
 	status: HiveStatus;
 }
 
-export function HiveCard({ number, queenStatus, strength, lastInspection, status }: HiveCardProps) {
+export function HiveCard({ label, queenStatus, strength, lastInspection, status }: HiveCardProps) {
+	const uninspected = queenStatus === null;
+
 	return (
 		<article className={`${CARD_BASE} ${CARD_TOP_EDGE[status]}`}>
 			<div className='flex items-start justify-between gap-2'>
 				<div className='min-w-0'>
-					<p className='font-mono text-[26px] font-semibold tracking-[-0.03em] text-foreground lg:text-[22px]'>
-						{number}
+					<p className='truncate font-mono text-[26px] font-semibold tracking-[-0.03em] text-foreground lg:text-[22px]'>
+						{label}
 					</p>
-					<p className={`mt-0.5 text-[13px] lg:text-[11px] ${QUEEN_LABEL_COLOR[queenStatus]}`}>
-						{QUEEN_LABELS[queenStatus]}
+					<p
+						className={`mt-0.5 text-[13px] lg:text-[11px] ${uninspected ? NO_INSPECTION_COLOR : QUEEN_LABEL_COLOR[queenStatus]}`}
+					>
+						{uninspected ? NO_INSPECTION_LABEL : QUEEN_LABELS[queenStatus]}
 					</p>
 				</div>
 				<span
-					className={`mt-2 h-2.25 w-2.25 shrink-0 rounded-full lg:mt-1.5 lg:h-1.75 lg:w-1.75 ${STATUS_DOT[status]}`}
+					className={`mt-2 h-2.25 w-2.25 shrink-0 rounded-full lg:mt-1.5 lg:h-1.75 lg:w-1.75 ${
+						uninspected ? NO_INSPECTION_DOT : STATUS_DOT[status]
+					}`}
 				/>
 			</div>
 

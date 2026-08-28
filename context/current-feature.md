@@ -1,16 +1,65 @@
-# Current Feature
+# Current Feature: Dashboard Spec 2 — Real Data from Database
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- `/dashboard` renders the signed-in user's own apiary from Postgres via Prisma — no hardcoded arrays left in `app/(dashboard)/dashboard/page.tsx`.
+- One `prisma.apiary.findUnique` with `include: { hives: { include: { currentInspection: true } } }` fetches everything; no N+1, no fetching inside `Sidebar` / `HiveCard` / `AlertCard`, which stay presentational.
+- Derived in the page, not the components: hive status, alert list and descriptions, colony strength, formatted inspection dates, and the page-header counts.
+- `types/inspection.ts` types the `queen` and `colony` JSON columns; casts to those interfaces are the only casts in the feature.
+- Sidebar footer shows the real first name and the real plan from `Subscription.tier`; the page header greets by first name.
+- Hives with no inspection render as "Brak przeglądu" with empty dots and a neutral card — the correct state for the seeded data, and proof the data layer works.
+- Auth guard in `app/(dashboard)/layout.tsx`; the layout also supplies the sidebar's name and plan.
+- Layout stays visually identical to Spec 1 apart from the three prop-contract widenings below.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+**Source spec:** `context/features/dashboard-spec-2.md`, including its own `/feature load` addendum from earlier today. That addendum was written at commit `3d1c421`, **before any auth work** — its "Blocked on auth" section is now obsolete and is superseded by what follows.
+
+**Auth has landed; here is what the spec's snippets must become:**
+
+- **`auth()` is imported from `@/auth`** — repo root, level with `app/`. Not `@/lib/auth`, not `app/lib/auth.ts`. Prisma stays at `@/app/lib/prisma`.
+- **`session.user.id` is already typed** by `types/next-auth.d.ts`, so no cast is needed to read it.
+- **`/dashboard/*` is already protected** by `proxy.ts`, which redirects to `/api/auth/signin?callbackUrl=…`. The layout's own `auth()` call is still worth adding — Proxy is an optimistic cookie check, not the boundary — but it is a second line of defence, not the thing that makes the route private.
+- **`/login` does not exist.** Redirect to `/api/auth/signin` instead, matching what Proxy already does. Phase 3 creates `/sign-in`; rename then, in one place.
+- **`Sidebar` is a client component** (`usePathname`) and now owns a sign-out `<form>` in its footer. Adding `userName` / `userPlan` props means the layout must read the session and the subscription and pass them down.
+
+**`/onboarding` is the one real blocker, and it is no longer hypothetical.** The spec redirects there when `apiary === null`, and the route does not exist. Three accounts hit that path today:
+
+- `borderlandsmaniak@gmail.com` (Google, dev **and** prod) — no apiary.
+- `demo@getapiary.app` **on production** — created through `/api/auth/register`, so it has no subscription, no apiary and no hives.
+- Only `demo@getapiary.app` **on the dev branch** has the full seeded shape (PREMIUM, `Pasieka Turawa`, 5 hives).
+
+So locally the happy path works and prod does not. Decide before implementing whether to build a minimal `/onboarding`, render an empty state in place of the redirect, or backfill the production account. An empty state is the smallest change and the only one that leaves no dead route.
+
+**Spec facts that are wrong for this repo** (from the existing addendum, re-verified):
+
+- Demo email is **`demo@getapiary.app`**, not `demo@hivewise.app`. The acceptance criteria name an address that has never existed.
+- `@/app/lib/prisma`, not `@/lib/prisma` — `@/*` maps to `./*` and there is no root `lib/`.
+- `prisma.apiary.findUnique({ where: { userId } })` is valid because `Apiary.userId` is `@unique`.
+
+**"No UI changes" is not quite true** — three Spec 1 contracts have to widen (verified again just now against the components):
+
+- `HiveCardProps.number` is a `number` and the card renders it bare; the spec passes `hive.label`, a string (`"Ul 1"`). Widen the prop to a string and drop the implicit "Ul " prefix, matching `AlertCardProps.hiveLabel`.
+- `HiveCardProps.queenStatus` is a required `QueenStatus` and `QUEEN_LABELS` has no absent case. Add the null branch and its muted colour **at the card**, not as a fourth `QueenStatus` member — "no inspection" is not a queen state.
+- `HiveStatus` is `'ok' | 'warning' | 'danger'`; the spec invents `'never_inspected'` and then says treat it as `'ok'`. `CARD_TOP_EDGE`, `STATUS_DOT` and `StrengthDots.FILLED_BY_STATUS` are all keyed exhaustively, so a fourth member means touching three maps. Carry "never inspected" as `queenStatus === null` instead, which has to exist anyway.
+
+**Ambiguities to settle while implementing:**
+
+- **Strength scale:** `frames_covered` is 0–10, `StrengthDots` renders 5. The spec says both "direct" and `Math.round(frames_covered / 2)` in one paragraph. Use the halving. Moot while nothing is inspected, wrong the moment something is.
+- **`getGreeting` has a dead branch** — `hour < 12` and `hour < 18` both return `Dzień dobry`. Correct Polish; collapse to two branches rather than inventing a third string.
+- **`/dashboard` stops being static.** `new Date()` in the render path forces dynamic; Spec 1 shipped it prerendered. Expected, not a regression. Pin the greeting to `Europe/Warsaw` rather than trusting Vercel's UTC.
+- **The meta line** ("5 uli · brak przeglądów · 0 wymaga uwagi") is a third format alongside Spec 1's `summary` and `hiveTypeSummary` and drops the hive-type line. Build it from real counts but keep both lines.
+- **`DashboardView` needs no `'use client'`** — nothing in it is interactive. A plain server component, or skip the wrapper entirely.
+- **`Inspection` has six JSON columns** (`queen`, `colony`, `comb`, `brood`, `health`, `actions`); the spec types two. `types/inspection.ts` gives the other four an obvious home.
+- **Honey and comb also exist as real scalar columns** — `honeyKg`, `honeySufficiency`, `combCondition`. The dashboard needs none of them; don't let `ColonyData` become the assumed source of truth for a value that has a typed column.
+
+**Carried from Phase 2, still true:** restart `next dev` after adding a server action or a new `@theme` key, run `prisma generate` explicitly after any schema change, and never run two `next dev` processes against this project.
+
+**Working tree is not clean at load time:** `prisma/create-account.ts` and its `package.json` script are untracked and uncommitted, `context/features/auth-phase-3-spec.md` has an unstaged edit, and `context/templates/dashboard.html` still carries 807 lines of changes that predate all of this session's work. None belong to this feature — settle them before `/feature start` cuts a branch.
 
 ## History
 
