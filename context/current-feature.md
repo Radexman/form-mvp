@@ -1,119 +1,16 @@
-# Current Feature: Dashboard Spec 1 — Static Layout
+# Current Feature
 
 ## Status
 
-In Progress — branch `feat/dashboard-static-layout`
+Not Started
 
 ## Goals
 
-- `/dashboard` renders without TypeScript, build, or console errors.
-- A `(dashboard)` route group exists with a shared `layout.tsx` owning the sidebar + main shell; `dashboard/page.tsx` is the static page.
-- Four new components: `Sidebar`, `Topbar`, `AlertCard`, `HiveCard` (plus a `StrengthDots` and a `Badge` the spec's markup implies).
-- Shell is full-viewport: 192px fixed sidebar that does not scroll, main area scrolls independently, topbar sticky at `z-10` with a surface background and bottom border.
-- Sidebar nav drives its active state from `usePathname()`; active item gets a 2px green left border and `rgba(74,222,128,0.05)` tint, inactive keeps a transparent 2px left border so nothing shifts.
-- Topbar renders apiary name + location on the left and two buttons on the right — "Dodaj ul" secondary, "Nowy przegląd" primary green — both with an inline 13px stroked plus icon.
-- Alerts section: 3-column grid of the three hardcoded alerts; warning cards carry an amber left border, danger a red one, each with the matching tinted badge ("Uwaga" / "Alarm").
-- Hive grid: 4 columns, 8 hardcoded cards. Hives 3 and 8 get an amber top border, hive 4 a red one, hives 1/2/5/6/7 no colored border.
-- `StrengthDots` renders 5 dots with `value` filled, tinted to the card's status (green / amber / red); empty dots are outline-only.
-- Queen label text and color follow the status mapping (`seen` green, `not_seen_brood_ok` amber, `missing` red).
-- Every hive card shows a "Szczegóły" ghost button and a green "Przegląd" primary button.
-- No hardcoded hex values in components — all color goes through CSS custom properties.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-**Source:** `context/features/dashboard-spec-1.md`. Visual reference: `context/screenshots/dashboard.png`, `context/templates/dashboard.html` (a complete standalone HTML/CSS mock — the spec is essentially a transcription of it, so the template is the tiebreaker on anything the spec leaves out).
-
-**Explicitly out of scope:** auth guard, session/user fetching, real DB data, click handlers, responsive/mobile, the Analytics and Settings pages.
-
-### Decisions made at `/feature start`
-
-1. **Palette:** retune `globals.css` to the template values (option 1 below). The inspection form inherits the darker treatment — accepted.
-2. **Nav:** `Dashboard` → `/dashboard` (grid-2x2, active here), `Analityka` → `/analytics`, `Ustawienia` → `/settings`. Matches the template and makes the active-state criterion pass. `/apiary` is dropped for now.
-3. **Wordmark:** `Hivewise`, per the spec — not the template's `GetApiary`.
-4. **Components live in `app/components/dashboard/`**, following repo convention.
-5. **Spec 2 seeds the real data.** Every hardcoded array here is a placeholder — keep the component prop shapes clean and data-agnostic so swapping in seeded records is a change to the page, not to the components.
-
-### Conflicts as found (resolved above)
-
-1. **The spec's token table is not what `app/globals.css` actually contains.** The spec says "use the existing token set" and then lists the *template's* palette. Existing vs. spec:
-
-   | Token | `globals.css` today | Spec / template |
-   |---|---|---|
-   | `--background` | `#0f1710` | `#0d0f0d` |
-   | `--surface` | `#1c2b1e` | `#141814` |
-   | `--surface-2` | `#243528` | `#1a1f1a` |
-   | `--surface-3` | `#2d4232` | `#202620` |
-   | `--foreground` | `#f0fdf4` | `#e8f0e8` |
-   | `--muted` | `#86efac` | `#6b7d6b` |
-   | `--subtle` | `#4b7a57` | `#3a4a3a` |
-   | `--border` | `#2d4232` (solid) | `rgba(255,255,255,0.06)` |
-   | `--border-2` | **does not exist** | `rgba(255,255,255,0.10)` |
-   | `--accent-warm` | `#fcd34d` | `#fbbf24` |
-
-   `--accent` (`#4ade80`) and `--danger` (`#f87171`) already agree. Decision needed: retune `globals.css` to the darker template palette (matches the screenshot, but restyles the existing inspection form too), or build the dashboard on the current greener tokens (won't match the reference). Either way `--border-2` has to be added, and both new tokens need `@theme inline` entries to be reachable as Tailwind classes.
-
-2. **The nav has no `/dashboard` entry, so nothing can be active on `/dashboard`.** The spec's table lists Pasieka → `/apiary`, Analityka → `/analytics`, Ustawienia → `/settings`, but the template and screenshot show the first item labeled **Dashboard** and highlighted. The acceptance criterion "Active nav item has green left border" cannot pass as written. Likely fix: first item is `Dashboard` → `/dashboard` with the grid-2x2 icon.
-
-3. **Logo wordmark:** spec says `Hivewise`, template and screenshot say `GetApiary`. Root layout metadata already says `Hivewise` — going with the spec unless told otherwise.
-
-4. **Component location:** spec asks for a root-level `components/dashboard/`. This repo has no root `components/`; everything lives under `app/components/<domain>/`. Plan to follow repo convention and use `app/components/dashboard/`.
-
-### Details the spec omits, filled from the template
-
-- Alerts section label is **Wymagają uwagi**; hive section label **Ule** with subtitle **8 uli wielkopolskich**.
-- Topbar text: **Pasieka Turawa** · **Turawa, woj. opolskie**.
-- Sidebar structure: logo block with its own bottom border, `nav` flexed to `flex: 1`, footer with a top border; avatar is a 28px circle, `--surface-3` background, `--accent` initials, `--border-2` ring.
-- Hive card footer is `margin-top: auto` in a column so cards in a row stay aligned at unequal heights.
-- Empty `StrengthDots` border is `--subtle` in the template but `--surface-3` in the spec — the two are the same value today in `globals.css`, so pick one deliberately.
-
-### Implementation constraints
-
-- Tailwind v4 with `@theme inline`; existing components use utility classes only, no CSS modules. Rgba tints (`rgba(74,222,128,0.05)`), the `#22c55e` hover, and exact pixel values from the spec will need arbitrary values or new tokens.
-- Sidebar needs `usePathname()`, so it's a client component; keep `layout.tsx` and `page.tsx` server components.
-- Root `app/layout.tsx` body is `min-h-full flex flex-col` — verify the `100vh` non-scrolling shell composes with it.
-- Repo style: tabs, single quotes, one JSX prop per line, Polish UI copy.
-- `app/layout.tsx` has an uncommitted change (metadata title → `Hivewise`), and `context/screenshots/`, `context/templates/`, and the spec itself are untracked. Sweep them in when branching.
-
-### Gotcha found while verifying
-
-**Adding a key to `@theme` needs a dev-server restart.** Turbopack hot-swaps changed `:root`
-values fine, but a *new* theme key is not registered by an already-running `next dev`. The three
-added here — `--color-accent-hover`, `--color-border-2`, `--color-border-3` — silently generated
-no utilities in the running server, so `border-border-2` fell back to `currentColor` (the avatar
-ring rendered green, the secondary button's ring muted) and both `hover:` tints were inert. A
-fresh compile and `next build` both emit all of them correctly. If the dashboard ever looks like
-its hairlines are the wrong colour, restart `next dev` before debugging the CSS.
-
-### Added to scope: responsive / mobile (requested mid-build)
-
-The spec listed "Responsive / mobile layout" as a separate spec. Pulled in anyway — this is a
-field tool, and the ask was specifically that **"Przegląd" be easy to tap**. Built mobile-first,
-with `lg:` (1024px) restoring the desktop mock exactly.
-
-- **Navigation splits in two.** `NAV_ITEMS` moved to `nav.ts`; `Sidebar` is now `hidden lg:flex`
-  and `MobileNav` renders the same destinations as a bottom tab bar below `lg` (56px tall tabs,
-  active marker moves from the left edge to the top edge). The bottom bar is a flex sibling of
-  `<main>`, not `fixed`, so it can never overlap content.
-- **Touch targets.** "Przegląd" 48px tall, "Szczegóły" 44px, topbar buttons 44px, tabs 56px —
-  all above the 44px minimum, measured in-browser at 320px and 390px wide. Hive-card buttons
-  stack vertically below `lg`; side by side inside a half-width card left them too narrow.
-- **Grids.** Hives 2 → 3 (`sm`) → 4 (`lg`). Alerts 1 → 2 (`sm`) → 3 (`lg`); one per row on
-  phones because truncating why a hive needs attention defeats the section.
-- **Type scale** lifted a step or two below `lg` (10–11px is unreadable outdoors); dots go 9 →
-  11px. Everything reverts at `lg`.
-- **Topbar** keeps one row on phones: name truncates, location hides below `sm`, "Dodaj ul"
-  collapses to a 44×44 icon button with an `aria-label`.
-- **`h-dvh`, not `h-screen`**, and the 640px `min-h` floor is now `lg:`-only. Both matter on
-  phones: `100vh` counts the collapsing URL bar, and a 640px floor pushed the tab bar off a
-  390px-tall landscape screen.
-- **`viewportFit: 'cover'`** added to the root layout so the tab bar's
-  `pb-[env(safe-area-inset-bottom)]` clears the iOS home indicator; without it `env()` is 0.
-- **`prefetch={false}`** on the nav links — the router was prefetching `/analytics` and
-  `/settings`, which don't exist yet, giving two console 404s per load. Marked TODO; drop it
-  when those routes land.
-
-**Verified at 320 / 390 / 768 / 844×390 / 1440:** no horizontal scroll and no element past the
-viewport at any width, desktop pixel-unchanged, console clean.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -169,3 +66,31 @@ Idempotent `prisma db seed` that stands up a full demo account. Merged to `main`
 **Verified** against the live Neon **development** branch (`br-old-bonus-b1yjip8c`): first run printed the spec's expected stdout (`periodStart` → `2026-08-01`), second run printed only the skip line; SQL confirmed 1/1/1/1/5 rows with no duplicates, correct enum and null-Stripe values, all `currentInspectionId` null, and 0 inspections / PDF jobs / AI reports; a throwaway probe confirmed `bcrypt.compare('demo1234')` → true, wrong password → false, and that a deliberate mid-transaction throw left zero rows. `tsc --noEmit`, `eslint`, `vitest run` (199 tests) and `next build` all green.
 
 **Left open:** `periodStart` uses the spec's literal `now.getFullYear()` / `now.getMonth()` (local getters) inside `Date.UTC`. In UTC+2, seeding between 00:00 and 02:00 local on the 1st yields the new month while `now` is still the previous month in UTC. Harmless for a demo seed; switch to `getUTCFullYear`/`getUTCMonth` if this ever backs real usage-quota logic.
+
+### Dashboard Spec 1 — Static Layout — completed 2026-08-28
+
+Post-login dashboard shell at `/dashboard`, built mobile-first with the desktop mock restored at `lg`. All data hardcoded; Spec 2 swaps in the seeded apiary. Merged to `main` as `068497c` (feature commit `995afce`).
+
+**Delivered**
+
+- `app/(dashboard)/layout.tsx` — shell owning the sidebar rail + scrolling `<main>` at `lg`, and `<main>` + bottom tab bar below it. `<main>` is the only scroll container, so each page's topbar sticks to the content rather than the viewport.
+- `app/(dashboard)/dashboard/page.tsx` — topbar, page header, 3 alerts, 8 hive cards, all constants.
+- `app/components/dashboard/` — `Sidebar`, `MobileNav`, `Topbar`, `AlertCard`, `HiveCard`, `StrengthDots`, `icons.tsx`, plus `nav.ts` (one `NAV_ITEMS` list, two presentations) and `status.ts` (`HiveStatus` / `QueenStatus` / label maps — the contract Spec 2's seeded records must satisfy).
+- `app/globals.css` — palette retuned to the reference; `--accent-hover`, `--border-2`, `--border-3` added with `@theme inline` entries.
+- `app/layout.tsx` — `viewport` export with `viewportFit: 'cover'` and `themeColor`.
+
+**Decisions worth remembering**
+
+- **A new `@theme` key is not picked up by a running `next dev`.** Turbopack hot-swaps changed `:root` *values* fine, but the three new keys generated no utilities in an already-running server, so `border-border-2` silently fell back to `currentColor` — green avatar ring, muted button ring, dead `hover:` tints. `next build` and a fresh compile emit all of them. **If the hairlines ever look wrong, restart the dev server before debugging the CSS.**
+- **Colored card edges are declared per side, never via a `border` shorthand + override.** `AlertCard` sets top/right/bottom explicitly and the accent left separately; `HiveCard` does the same with the accent on top. Hover lightens only the neutral sides, so it can't repaint the amber or red edge. A shorthand `hover:border-border-2` would have.
+- **`h-dvh`, not `h-screen`, and the 640px `min-h` floor is `lg:`-only.** `100vh` counts the collapsing mobile URL bar; the floor pushed the tab bar off a 390px-tall landscape phone. Verified at 844×390 — shell exactly 390, tab bar on screen.
+- **`viewportFit: 'cover'` is mandatory for the tab bar's `pb-[env(safe-area-inset-bottom)]`** — without it `env()` resolves to 0 and the bar sits under the iOS home indicator.
+- **Touch targets sized for gloved, one-handed outdoor use:** "Przegląd" 48px, "Szczegóły" and topbar buttons 44px, tabs 56px. Card buttons stack below `lg`; side by side inside a half-width card left each ~66px wide.
+- **Spec vs. template, resolved deliberately:** template wins on look (palette, nav icons, `Dashboard` as the first nav item — the spec's `/apiary` list left nothing active on `/dashboard`); spec wins on its explicit callouts (`Hivewise` wordmark, green `Premium` badge). Components live in `app/components/dashboard/`, not the spec's root `components/`, per repo convention.
+- **Empty `StrengthDots` border uses `--subtle`** (template) rather than the spec's `--surface-3`; after the retune those are no longer the same value and `--subtle` stays legible.
+- **Tailwind canonical spacing steps over arbitrary px** (`gap-2.25`, not `gap-[9px]`) — the project's IntelliSense flags the arbitrary forms. Same output.
+- **The badge was left inline in `AlertCard`** rather than extracted as the `Badge` component the spec's markup implies: seven classes used once.
+
+**Verified** on the production build at 320 / 390 / 768 / 844×390 / 1440: no horizontal scroll and no element past the viewport at any width; sidebar exactly 192px and pinned through a scroll; `<main>` the only scroll container; topbar `sticky`/`z-10`; grids 4/3 at `lg`, 2/1 on phones; every border read side-by-side (hive 4 = `2px red / 0.06 / 0.06 / 0.06`, lifting to `0.1` on hover with the red intact); every touch target measured. `tsc --noEmit`, `eslint`, `prettier`, `vitest run` (199 tests) and `next build` all green; `/dashboard` prerenders static.
+
+**Left open:** `prefetch={false}` on the nav links is a TODO — the router was prefetching `/analytics` and `/settings`, which don't exist yet, as two console 404s per load. Drop it when those routes land. The sidebar footer (avatar / name / plan) has no mobile equivalent; `Ustawienia` covers it for now. Hive grid is 2-up on phones — trades card width for fewer scrolls; a one-line change if 1-up is preferred.
