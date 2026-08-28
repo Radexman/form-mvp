@@ -1,86 +1,16 @@
-﻿# Current Feature
-
-Auth Phase 1 — NextAuth v5 + Google OAuth
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- `next-auth@beta` (v5) + `@auth/prisma-adapter` installed, wired to the existing Prisma singleton, JWT session strategy.
-- Google OAuth sign-in works end to end: `/dashboard` while signed out redirects to NextAuth's default sign-in page; "Sign in with Google" returns to `/dashboard` signed in.
-- `proxy.ts` at the repo root protects `/dashboard/*`, exported as `export const proxy = auth(...)`.
-- `auth()` is callable from server components and returns a session carrying `user.id` — the contract Dashboard Spec 2 is waiting on.
-- Session type augmented so `session.user.id` type-checks without a cast.
-- `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` in `.env.local`, with names (not values) mirrored into `.env.example`.
-- `tsc --noEmit`, `eslint`, `prettier`, `vitest run` and `next build` green.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-Spec: [auth-phase-1-spec.md](context/features/auth-phase-1-spec.md). Verified against Next.js 16.2.6's bundled docs and current Auth.js docs.
-
-**Provider changed to Google** (user decision, supersedes the spec's GitHub). Everything structural in the spec is unaffected — only the provider import, the two env var names, and the OAuth app registration differ. Google is also the better fit technically here; see below.
-
-### Blocking: the `User` model cannot accept an OAuth sign-in
-
-`PrismaAdapter.createUser` writes only Auth.js's own fields. Against the current schema, the first Google sign-in fails. A migration has to land before anything else in this phase can be tested:
-
-- **`passwordHash String` is NOT NULL with no default.** The adapter never supplies it → Postgres not-null violation on `createUser`. Must become `String?`. Phase 2 ("add password field via migration if not already there") assumes this column exists; making it nullable is what lets OAuth-only and credentials users coexist in one table.
-- **No `emailVerified DateTime?`** — a required field in Auth.js's canonical `User`. The adapter reads and writes it.
-- **No `image String?`** — same, and Phase 3 explicitly wants an avatar with an initials fallback in the sidebar, so it is needed regardless. Google supplies `picture`.
-
-Note this is required even though the spec chooses `strategy: 'jwt'`. JWT skips `createSession` / `getSessionAndUser`, but `createUser`, `linkAccount` and `getUserByAccount` still run through the adapter on every first sign-in.
-
-**Google makes the `email String @unique` non-null column safe.** Auth.js's canonical `User.email` is nullable; this repo's is not. That would have been a real failure mode with GitHub, where a user can hide their email. Google always returns an email plus an `email_verified` claim, so a non-null column is fine — one less thing to migrate. Worth keeping in mind if a provider without that guarantee is ever added.
-
-### The spec's file paths assume a `src/` directory that doesn't exist
-
-Every path in "Files to Create" is `src/`-prefixed. This repo has no `src/`; `app/` sits at the root and `tsconfig.json` maps `@/*` → `./*`. Translation:
-
-| Spec | This repo |
-| --- | --- |
-| `src/auth.config.ts` | `auth.config.ts` (root) |
-| `src/auth.ts` | `auth.ts` (root) |
-| `src/app/api/auth/[...nextauth]/route.ts` | `app/api/auth/[...nextauth]/route.ts` |
-| `src/proxy.ts` | `proxy.ts` (root) |
-| `src/types/next-auth.d.ts` | `types/next-auth.d.ts` (new dir) |
-
-Root is correct for `proxy.ts` specifically — the Next 16 docs require it "at the same level as `pages` or `app`". `app/api/auth/[...nextauth]/` is new; the only existing route is `app/api/generate-pdf/route.ts`. `types/` does not exist yet, and `tsconfig` `include` already covers `**/*.ts`, so a new top-level `types/` needs no config change.
-
-Worth settling on the way in: a root `auth.ts` breaks the convention that shared modules live in `app/lib/` (where `prisma.ts` is). But Auth.js docs and both later phases say `@/auth`, and `proxy.ts` importing from `app/lib/` is odd since proxy lives outside `app/`. Recommend following the spec — root `auth.ts` / `auth.config.ts` — and staying consistent across all three phases rather than optimizing this one file.
-
-### The split-config rationale is obsolete in Next 16 (the pattern still isn't wrong)
-
-The spec asks for the split "for edge compatibility". That reason no longer holds:
-
-- Next 16's bundled docs: *"Proxy defaults to using the Node.js runtime. The `runtime` config option is not available in Proxy files. Setting the `runtime` config option in Proxy will throw an error."*
-- Auth.js's own edge-compatibility guide now scopes the problem to *"Next.js versions prior to 16"*.
-
-So Prisma-over-TCP in `proxy.ts` would actually run. Still do the split — it keeps the Prisma client and the `pg` driver out of a file that executes on every matched request, which the Next docs warn against for exactly this reason (*"only read the session from the cookie… avoid database checks"*). Just record the real justification (request-path weight) rather than the stale one (edge runtime), so nobody later "fixes" it back.
-
-### Google specifics
-
-- **Env vars are `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`.** Auth.js infers these from the `AUTH_<PROVIDER>_ID|SECRET` convention, so `Google` needs no explicit `clientId` / `clientSecret` — just `providers: [Google]`.
-- **Callback URL is `http://localhost:3000/api/auth/callback/google`** in the Google Cloud Console OAuth client (type: Web application). Production needs its own entry. Google accepts `http://localhost` but rejects plain `http://` for any other host.
-- **The OAuth consent screen must be configured before the client works,** and while it is in "Testing" status only explicitly listed test users can sign in. Add the demo account there or the first sign-in fails with `access_denied` for reasons that have nothing to do with the code.
-- **Do not add the `access_type: 'offline'` / `prompt: 'consent'` refresh-token dance.** Auth.js documents it, but it exists for calling Google APIs on the user's behalf, which this app never does — and `prompt: 'consent'` forces the consent screen on *every* sign-in. Plain `Google` is right here. The `Account.refresh_token` column simply stays null.
-- Google returns `email_verified` in the profile. A `signIn` callback could gate on it, but Google only issues verified emails for standard accounts — not worth adding in Phase 1.
-
-### Verified compatibility
-
-- `next-auth@beta` is `5.0.0-beta.32`; peer range `next: ^14 || ^15 || ^16`, `react: ^18.2 || ^19`. Compatible with `next@16.2.6` / `react@19.2.4`. The spec is right that `@latest` installs v4 (`4.24.15`) — use `@beta`.
-- `@auth/prisma-adapter` is `2.11.3`. Peer `@prisma/client` is `>=2.26.0`, which `7.10.0` satisfies. **But** it is built and tested against Prisma 6 (its own devDependency), and this project generates the client to `generated/prisma` rather than `@prisma/client`. If `PrismaAdapter(prisma)` produces a type error, that mismatch is the cause — not a version conflict.
-- Named `export const proxy = auth(...)` is confirmed valid: the Next 16 docs accept a default export or a named `proxy` export, and Auth.js's migration guide shows this exact form.
-
-### Smaller things
-
-- **`.env.local` is gitignored (`.env*`), `.env.example` is not.** Add the three new key names to `.env.example` with empty values; never the secrets. Generate `AUTH_SECRET` with `npx auth secret`.
-- **This phase strands the demo user.** `demo@getapiary.app` exists with a `passwordHash` and no linked OAuth account, and it owns the only seeded apiary and its 5 hives. Signing in with Google creates a *different* user with no apiary, so `/dashboard` will hit Dashboard Spec 2's `apiary === null` path — which redirects to an `/onboarding` route that doesn't exist. Expected for Phase 1 (credentials arrive in Phase 2), but decide what a fresh OAuth user sees so the happy path isn't a 404. Cheapest stopgap: sign in to Google with the seeded address, or re-point the seed at the Google account's email so the demo data is reachable.
-- **Don't set `pages.signIn`** — the spec is explicit that Phase 3 replaces the default page. Leaving it default now gives Phase 3 one place to change.
-- **`proxy.ts` matcher**: scope to `/dashboard/:path*` per the spec. Auth.js's general advice is to run proxy on all routes, but that would also intercept `/` and `/api/generate-pdf`, which are public today.
-- **No existing `proxy.ts` or `middleware.ts`** to migrate — this is a clean first one.
-- The spec's Testing step 2 says "Sign in with GitHub"; read it as Google.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -164,3 +94,32 @@ Post-login dashboard shell at `/dashboard`, built mobile-first with the desktop 
 **Verified** on the production build at 320 / 390 / 768 / 844×390 / 1440: no horizontal scroll and no element past the viewport at any width; sidebar exactly 192px and pinned through a scroll; `<main>` the only scroll container; topbar `sticky`/`z-10`; grids 4/3 at `lg`, 2/1 on phones; every border read side-by-side (hive 4 = `2px red / 0.06 / 0.06 / 0.06`, lifting to `0.1` on hover with the red intact); every touch target measured. `tsc --noEmit`, `eslint`, `prettier`, `vitest run` (199 tests) and `next build` all green; `/dashboard` prerenders static.
 
 **Left open:** `prefetch={false}` on the nav links is a TODO — the router was prefetching `/analytics` and `/settings`, which don't exist yet, as two console 404s per load. Drop it when those routes land. The sidebar footer (avatar / name / plan) has no mobile equivalent; `Ustawienia` covers it for now. Hive grid is 2-up on phones — trades card width for fewer scrolls; a one-line change if 1-up is preferred.
+
+### Auth Phase 1 — NextAuth v5 + Google OAuth — completed 2026-08-28
+
+Auth.js v5 with the Prisma adapter, JWT sessions, and Google OAuth protecting `/dashboard/*`. Provider switched from the spec's GitHub to Google by user decision. Merged to `main` as `a497ad9` (feature commit `f8379db`).
+
+**Delivered**
+
+- `auth.config.ts` — provider list + the `authorized` callback. `auth.ts` — same config plus `PrismaAdapter`, `session.strategy: 'jwt'`, and `jwt` / `session` callbacks that carry `user.id`.
+- `proxy.ts` (repo root, level with `app/`) — `export const proxy = auth`, `matcher: ['/dashboard/:path*']`.
+- `app/api/auth/[...nextauth]/route.ts`, `types/next-auth.d.ts`.
+- Migration `20260828201002_auth_user_oauth_fields` — `passwordHash` → nullable, `emailVerified` and `image` added. Applied to the Neon **development** branch.
+- `next-auth@5.0.0-beta.32` and `@auth/prisma-adapter@2.11.3`, both pinned exact per the Prisma convention.
+
+**Decisions worth remembering**
+
+- **`callbacks.authorized` is what protects routes — without it nothing is protected.** next-auth defaults `authorized` to `true`, so a bare `export const proxy = auth` attaches `req.auth` and lets every request through. `/dashboard` returned 200 until the callback existed. **And the export must stay bare:** in `next-auth/lib/index.js` the `userMiddlewareOrRoute` branch is checked *before* `!authorized`, so wrapping it as `auth(fn)` suppresses next-auth's built-in redirect to `/api/auth/signin?callbackUrl=…`.
+- **Augment `@auth/core/jwt`, not `next-auth/jwt`.** Auth.js's docs say the latter, but on this version `next-auth/jwt` is a bare `export * from "@auth/core/jwt"` — augmenting a re-exporting module declares a second, unused `JWT` instead of merging, leaving `token.id` as `unknown` (which narrows to `{}` under a truthiness check).
+- **`prisma migrate dev` applied the migration but did NOT regenerate the client**, while reporting success. The generated client kept `passwordHash` required and had no `emailVerified` / `image` at all, so `PrismaAdapter.createUser` failed with `Argument 'passwordHash' is missing` — a Prisma-client validation error that never reached Postgres. **No gate could catch this:** `tsc`, `eslint` and `next build` all passed, because no app code references those fields and `PrismaAdapter(prisma)` is loosely typed. Only a real sign-in surfaced it. Fix: explicit `npx prisma generate` plus `rm -rf .next/dev` so Turbopack drops the bundled stale client. **Run `prisma generate` explicitly after any schema change.**
+- **The split config is right, but not for the documented reason.** Next 16 runs Proxy on the Node.js runtime (`runtime` config throws), and Auth.js now scopes the edge problem to "versions prior to 16". Prisma in `proxy.ts` would work. The split stays because Proxy runs ahead of every matched request and the Next docs say to read the cookie, not the database.
+- **`...authConfig.callbacks` must be spread inside `auth.ts`'s `callbacks`** — a bare `callbacks: {…}` after `...authConfig` replaces the object wholesale and silently drops `authorized`.
+- **No `access_type: 'offline'` / `prompt: 'consent'`.** Refresh tokens exist for calling Google APIs on the user's behalf, which this app never does, and `prompt: 'consent'` would force the consent screen on every sign-in. `Account.refresh_token` stays null by design.
+- **`allowDangerousEmailAccountLinking: true`** — safe specifically because Google verifies every email it returns. Currently dormant (no Google account matches `demo@getapiary.app`); it exists so Phase 2 credentials users can also sign in with Google.
+- **Google removes the need to make `User.email` nullable.** Auth.js's canonical `User.email` is optional; this repo's is `String @unique`. That would have been a live failure with GitHub, where users can hide their address.
+- **Provider takes no arguments** — Auth.js infers `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` from the `AUTH_<PROVIDER>_*` convention.
+- **Spec paths were all `src/`-prefixed; this repo has no `src/`.** Everything moved to the root or `app/`. `proxy.ts` at the root is required by Next, not a preference.
+
+**Verified** end to end against the Neon **development** branch: Google consent created `borderlandsmaniak@gmail.com` with `image` set and `passwordHash` null, linked one `google` / `oidc` `Account` with an `access_token` and no refresh token, wrote **zero** `Session` rows (confirming the JWT strategy), and left the seeded demo user and its apiary untouched. Signed out, `/dashboard` 307s to `/api/auth/signin?callbackUrl=…` while `/` and `/api/generate-pdf` stay public. The client ID and redirect URI were also validated directly against Google's authorize endpoint. `tsc --noEmit`, `eslint`, `prettier`, `vitest run` (199 tests) and `next build` all green.
+
+**Left open:** a fresh Google user has no apiary, so once Dashboard Spec 2 lands they hit its `apiary === null` → `/onboarding` redirect, and that route does not exist. Accepted deliberately: only the demo user shows seeded data for now. Until Spec 2, `/dashboard` renders Spec 1's static mock for any signed-in user, so Phase 1's happy path is clean. `AUTH_SECRET` and the two Google values are in `.env.local` only; Vercel still needs them, plus a production redirect URI on the OAuth client. The consent screen is in **Testing** status — only listed test users can sign in. No sign-out UI yet (Phase 3). `emailVerified` stays null: the Prisma adapter only sets it for email-link flows, not OAuth.
