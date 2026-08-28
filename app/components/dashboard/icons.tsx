@@ -107,3 +107,23 @@ export function PlusIcon({ className }: { className?: string }) {
 		</svg>
 	);
 }
+
+/** Door with an arrow leaving it — the sidebar's sign-out control. */
+export function SignOutIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox='0 0 24 24'
+			aria-hidden='true'
+			className={className}
+		>
+			<path d='M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4' />
+			<polyline points='16,8 20,12 16,16' />
+			<line
+				x1='20'
+				y1='12'
+				x2='10'
+				y2='12'
+			/>
+		</svg>
+	);
+}

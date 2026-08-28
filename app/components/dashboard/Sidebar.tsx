@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { HexIcon } from './icons';
+import { signOutAction } from '@/app/lib/auth-actions';
+
+import { HexIcon, SignOutIcon } from './icons';
 import { isNavItemActive, NAV_ITEMS } from './nav';
 
 /**
@@ -53,10 +55,27 @@ export function Sidebar() {
 				<span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-2 bg-surface-3 text-[11px] font-semibold text-accent'>
 					RS
 				</span>
-				<span className='flex flex-col'>
-					<span className='text-[12px] font-medium text-foreground'>Radosław S.</span>
+				<span className='flex min-w-0 flex-1 flex-col'>
+					<span className='truncate text-[12px] font-medium text-foreground'>Radosław S.</span>
 					<span className='text-[10px] text-accent'>Premium</span>
 				</span>
+
+				{/*
+				 * A form, not an onClick — `signOutAction` is a server action and this
+				 * has to be a POST. Phase 3 folds it into a dropdown on the avatar;
+				 * until then it is the only way out of a session short of clearing
+				 * cookies, which is what made testing credentials sign-in awkward.
+				 */}
+				<form action={signOutAction}>
+					<button
+						type='submit'
+						title='Wyloguj się'
+						aria-label='Wyloguj się'
+						className='flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-3 hover:text-foreground'
+					>
+						<SignOutIcon className='h-4 w-4 fill-none stroke-current stroke-[1.8]' />
+					</button>
+				</form>
 			</div>
 		</aside>
 	);

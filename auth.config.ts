@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 
 /**
@@ -12,6 +13,40 @@ import Google from 'next-auth/providers/google';
  *
  * `auth.ts` spreads this and adds the adapter.
  */
+
+/**
+ * Exported so `auth.ts` can reuse it by reference. That file rebuilds the
+ * provider list from scratch (see below), and Google's options should be
+ * declared exactly once.
+ */
+export const googleProvider = Google({
+	// Links a Google sign-in to an existing user with the same address instead of
+	// failing with OAuthAccountNotLinked. "Dangerous" only for providers that let
+	// an account hold an unverified address — Google verifies every email it
+	// returns, so the account cannot be claimed by someone who merely typed the
+	// address. With credentials sign-in in place this is no longer hypothetical:
+	// it is what lets someone who registered with a password later use the Google
+	// button on the same address.
+	allowDangerousEmailAccountLinking: true,
+});
+
+/**
+ * A deliberately inert copy of the Credentials provider.
+ *
+ * The real `authorize` has to reach Prisma and bcrypt, which is precisely what
+ * this file exists to keep out of the Proxy module graph — so it lives in
+ * `auth.ts`, which replaces this entry wholesale.
+ *
+ * `authorize: () => null` means this copy can never sign anyone in. Harmless:
+ * `config.matcher` never routes `/api/auth/*` through Proxy, so the instance
+ * built here only ever reads the session cookie. The entry exists so both
+ * instances describe the same provider list.
+ */
+export const credentialsPlaceholder = Credentials({
+	credentials: { email: {}, password: {} },
+	authorize: () => null,
+});
+
 export default {
 	callbacks: {
 		/**
@@ -31,14 +66,5 @@ export default {
 			return Boolean(auth?.user);
 		},
 	},
-	providers: [
-		Google({
-			// Links a Google sign-in to an existing user with the same address
-			// instead of failing with OAuthAccountNotLinked. "Dangerous" only for
-			// providers that let an account hold an unverified address — Google
-			// verifies every email it returns, so the account cannot be claimed by
-			// someone who merely typed the address.
-			allowDangerousEmailAccountLinking: true,
-		}),
-	],
+	providers: [googleProvider, credentialsPlaceholder],
 } satisfies NextAuthConfig;
