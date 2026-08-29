@@ -46,10 +46,21 @@ function currentPeriodStart(now: Date): Date {
 async function main() {
 	const existing = await prisma.user.findUnique({
 		where: { email: DEMO_EMAIL },
-		select: { id: true },
+		select: { id: true, emailVerified: true },
 	});
 
 	if (existing) {
+		// The demo account predates email verification, so a seeded database from
+		// before this feature would otherwise be parked on /verify-email forever
+		// with no inbox to check.
+		if (!existing.emailVerified) {
+			await prisma.user.update({
+				where: { id: existing.id },
+				data: { emailVerified: new Date() },
+			});
+			console.log('[seed] Marked existing demo user as verified.');
+		}
+
 		console.log('[seed] Demo user already exists — skipping.');
 		return;
 	}
@@ -66,6 +77,9 @@ async function main() {
 					email: DEMO_EMAIL,
 					name: DEMO_NAME,
 					passwordHash,
+					// No inbox to click through; the demo account must reach /dashboard
+					// straight after seeding.
+					emailVerified: new Date(),
 				},
 			});
 			console.log(`[seed] Created user: ${user.email} (id: ${user.id})`);

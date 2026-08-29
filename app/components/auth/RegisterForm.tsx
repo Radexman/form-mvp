@@ -16,7 +16,7 @@ interface RegisterErrorBody {
 /**
  * Posts to the route handler, not a server action — it already exists and its
  * status codes carry meaning (409 taken vs 400 invalid). Does not sign anyone
- * in; hands off to `/sign-in`.
+ * in; hands off to `/register/check-email`.
  */
 export function RegisterForm() {
 	const router = useRouter();
@@ -47,7 +47,9 @@ export function RegisterForm() {
 		}
 
 		if (response.ok) {
-			router.push('/sign-in?registered=1');
+			// The route normalises the address before storing it; re-normalise here
+			// so the confirmation page names the same one the email went to.
+			router.push(`/register/check-email?email=${encodeURIComponent(values.email.trim().toLowerCase())}`);
 			return;
 		}
 

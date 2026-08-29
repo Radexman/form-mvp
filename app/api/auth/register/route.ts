@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { registerSchema } from '@/app/lib/auth.schema';
+import { issueVerificationEmail } from '@/app/lib/email/issue-verification';
 import { prisma } from '@/app/lib/prisma';
 import { Prisma } from '@/generated/prisma/client';
 
@@ -78,7 +79,20 @@ export async function POST(request: Request) {
 			select: { id: true, name: true, email: true },
 		});
 
-		return Response.json({ user }, { status: 201 });
+		// The account exists either way. A Resend outage must not turn into a 500
+		// that tells the user registration failed — they would retry into a 409 on
+		// their own address, with no way forward. The token is already stored, so
+		// the re-send button on `/register/check-email` recovers it.
+		let emailSent = true;
+
+		try {
+			await issueVerificationEmail(user.id, user.email);
+		} catch (error) {
+			console.error('[register] verification email failed', error);
+			emailSent = false;
+		}
+
+		return Response.json({ user, emailSent }, { status: 201 });
 	} catch (error) {
 		// The check above is not atomic: two registrations for the same address can
 		// both pass it and race into the unique index. P2002 is that race, and it

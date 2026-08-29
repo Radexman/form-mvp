@@ -23,6 +23,11 @@ model User {
   // that register with an email and password.
   passwordHash String?
 
+  // One live token per user, so a re-send overwrites the previous link rather
+  // than leaving both working. Both are nulled the moment the link is consumed.
+  verificationToken          String?   @unique
+  verificationTokenExpiresAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

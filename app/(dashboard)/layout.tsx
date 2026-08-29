@@ -34,13 +34,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
 		redirect('/sign-in');
 	}
 
-	// Separate from the page's apiary query on purpose: the plan badge belongs to
-	// the shell, which outlives any one page. One indexed lookup on a unique
-	// column, and it selects a single column rather than the row.
-	const subscription = await prisma.subscription.findUnique({
-		where: { userId: session.user.id },
-		select: { tier: true },
+	// One lookup covers both the shell's plan badge and the verification gate.
+	const user = await prisma.user.findUnique({
+		where: { id: session.user.id },
+		select: { emailVerified: true, subscription: { select: { tier: true } } },
 	});
+
+	if (!user) {
+		redirect('/sign-in');
+	}
+
+	// Google accounts are stamped verified when the account is linked (see the
+	// `linkAccount` event in `auth.ts`), so this needs no provider clause.
+	if (!user.emailVerified) {
+		redirect('/verify-email');
+	}
 
 	return (
 		<div className='flex h-dvh w-full flex-col lg:min-h-160 lg:flex-row'>
@@ -50,7 +58,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 				userImage={session.user.image ?? null}
 				// No subscription row at all reads as FREE — the seed writes one, but
 				// an account created through `/api/auth/register` has none.
-				isPremium={subscription?.tier === 'PREMIUM'}
+				isPremium={user.subscription?.tier === 'PREMIUM'}
 			/>
 			<main className='flex flex-1 flex-col overflow-y-auto'>{children}</main>
 			<MobileNav />
