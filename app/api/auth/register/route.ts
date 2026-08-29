@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { registerSchema } from '@/app/lib/auth.schema';
+import { isEmailVerificationEnabled } from '@/app/lib/email/config';
 import { issueVerificationEmail } from '@/app/lib/email/issue-verification';
 import { prisma } from '@/app/lib/prisma';
 import { Prisma } from '@/generated/prisma/client';
@@ -72,10 +73,25 @@ export async function POST(request: Request) {
 	}
 
 	const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+	const verificationRequired = isEmailVerificationEnabled();
 
 	try {
 		const user = await prisma.user.create({
-			data: { name, email, passwordHash },
+			data: {
+				name,
+				email,
+				passwordHash,
+				/**
+				 * Stamped at creation when verification is off, and this is the single
+				 * most important line in the feature. Skipping only the *send* would
+				 * leave a population of `emailVerified: null` accounts that sign in
+				 * fine today and are all locked out the moment the flag is switched
+				 * on — the same failure `20260829130000_backfill_email_verified` had
+				 * to repair for accounts that predated verification. Writing the stamp
+				 * here means switching the flag on later never needs a backfill.
+				 */
+				emailVerified: verificationRequired ? null : new Date(),
+			},
 			select: { id: true, name: true, email: true },
 		});
 
@@ -83,16 +99,27 @@ export async function POST(request: Request) {
 		// that tells the user registration failed — they would retry into a 409 on
 		// their own address, with no way forward. The token is already stored, so
 		// the re-send button on `/register/check-email` recovers it.
-		let emailSent = true;
+		let emailSent = false;
 
-		try {
-			await issueVerificationEmail(user.id, user.email);
-		} catch (error) {
-			console.error('[register] verification email failed', error);
-			emailSent = false;
+		if (verificationRequired) {
+			emailSent = true;
+
+			try {
+				await issueVerificationEmail(user.id, user.email);
+			} catch (error) {
+				console.error('[register] verification email failed', error);
+				emailSent = false;
+			}
+		} else if (process.env.NODE_ENV !== 'production') {
+			// Answers the question this branch otherwise raises silently in dev:
+			// the account was created and no email is coming.
+			console.info('[register] EMAIL_VERIFICATION_ENABLED is off — account created already verified, no email sent');
 		}
 
-		return Response.json({ user, emailSent }, { status: 201 });
+		// `verificationRequired` is what the client branches on: `emailSent: false`
+		// alone is ambiguous between "verification is off" and "the send failed",
+		// and those two need opposite next screens.
+		return Response.json({ user, emailSent, verificationRequired }, { status: 201 });
 	} catch (error) {
 		// The check above is not atomic: two registrations for the same address can
 		// both pass it and race into the unique index. P2002 is that race, and it

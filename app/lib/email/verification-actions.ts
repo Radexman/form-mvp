@@ -3,6 +3,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/app/lib/prisma';
 
+import { isEmailVerificationEnabled } from './config';
 import { issueVerificationEmail } from './issue-verification';
 
 export interface ResendResult {
@@ -12,6 +13,14 @@ export interface ResendResult {
 
 const SENT = 'Wysłaliśmy nowy link aktywacyjny. Sprawdź swoją skrzynkę.';
 const FAILED = 'Nie udało się wysłać wiadomości. Spróbuj ponownie za chwilę.';
+const DISABLED = 'Potwierdzanie adresu e-mail jest obecnie wyłączone.';
+
+/**
+ * Both actions check the flag themselves rather than trusting their pages to
+ * have redirected. A server action is reachable by anyone who has its `$ACTION_ID`
+ * — from a stale tab open across the flip, or lifted out of the page source —
+ * so the pages' redirects hide the button but do not disable the endpoint.
+ */
 
 /**
  * Re-sends to the address on the *session*, never to one supplied by the
@@ -19,6 +28,10 @@ const FAILED = 'Nie udało się wysłać wiadomości. Spróbuj ponownie za chwil
  * for anyone who can read the action id out of the page.
  */
 export async function resendVerificationAction(): Promise<ResendResult> {
+	if (!isEmailVerificationEnabled()) {
+		return { ok: false, message: DISABLED };
+	}
+
 	const session = await auth();
 
 	if (!session?.user?.id) {
@@ -55,6 +68,10 @@ export async function resendVerificationAction(): Promise<ResendResult> {
  * page cannot be used to test which addresses are registered.
  */
 export async function resendVerificationForEmailAction(email: string): Promise<ResendResult> {
+	if (!isEmailVerificationEnabled()) {
+		return { ok: false, message: DISABLED };
+	}
+
 	const normalised = email.trim().toLowerCase();
 
 	const user = await prisma.user.findUnique({

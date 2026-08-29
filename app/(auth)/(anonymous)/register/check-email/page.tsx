@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { ResendVerificationButton } from '@/app/components/auth/ResendVerificationButton';
 import { MailIcon } from '@/app/components/dashboard/icons';
+import { isEmailVerificationEnabled } from '@/app/lib/email/config';
 import { resendVerificationForEmailAction } from '@/app/lib/email/verification-actions';
 
 export const metadata: Metadata = {
@@ -12,6 +13,13 @@ export const metadata: Metadata = {
 
 export default async function CheckEmailPage({ searchParams }: { searchParams: Promise<{ email?: string }> }) {
 	const { email } = await searchParams;
+
+	// With verification off the register form goes straight to `/sign-in`, so
+	// this page is only reachable by hand — and it would promise an email that
+	// is never coming.
+	if (!isEmailVerificationEnabled()) {
+		redirect('/sign-in');
+	}
 
 	// Reached only by the register form's redirect; without an address there is
 	// nothing to show and nothing to re-send to.
