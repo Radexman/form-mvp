@@ -90,6 +90,18 @@ Example v4 configuration:
 - No commented-out code unless specified
 - No unused imports or variables
 - Keep functions under 50 lines when possible
+
+### Comments
+
+Keep them sparse — roughly one to three short comments per file.
+
+- Write a comment only where the code would otherwise mislead, or where a future
+  edit would silently break something. If you can't name the bug it prevents,
+  don't write it.
+- No multi-paragraph file headers, no JSDoc on props whose names already say it,
+  no explaining why a colour or spacing value was chosen.
+- Design decisions and the reasoning behind an approach belong in
+  `context/current-feature.md`, not in the source.
 ```
 
 ## Repository layout

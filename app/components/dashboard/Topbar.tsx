@@ -1,4 +1,8 @@
+import { auth } from '@/auth';
+import { formatShortName } from '@/app/lib/dashboard';
+
 import { PlusIcon } from './icons';
+import { UserMenu } from './UserMenu';
 
 /**
  * `min-h-11` is the 44px touch minimum; it only relaxes to the mock's compact
@@ -21,8 +25,13 @@ interface TopbarProps {
  * Sticky against the scroll container in `(dashboard)/layout.tsx` — the `<main>`
  * element, not the viewport — which is why it needs an explicit surface
  * background rather than inheriting the page's.
+ *
+ * Async because below `lg` it carries the account menu. Reads the session
+ * itself rather than taking a prop — a JWT cookie decode, not a query.
  */
-export function Topbar({ apiaryName, location }: TopbarProps) {
+export async function Topbar({ apiaryName, location }: TopbarProps) {
+	const session = await auth();
+
 	return (
 		<header className='sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-b-border bg-surface px-4 py-2 lg:px-6 lg:py-3'>
 			{/* min-w-0 lets the name truncate instead of shoving the buttons off-screen. */}
@@ -51,6 +60,17 @@ export function Topbar({ apiaryName, location }: TopbarProps) {
 					<PlusIcon className={ICON} />
 					Nowy przegląd
 				</button>
+
+				{/* Phones only — from `lg` up this menu lives in the sidebar footer. */}
+				{session?.user && (
+					<UserMenu
+						variant='topbar'
+						className='lg:hidden'
+						name={session.user.name ?? null}
+						shortName={formatShortName(session.user.name ?? null)}
+						image={session.user.image ?? null}
+					/>
+				)}
 			</div>
 		</header>
 	);

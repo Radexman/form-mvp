@@ -90,6 +90,30 @@ body {
 	background-color: var(--accent);
 }
 
+/* Honeycomb drift on the auth screens. `--comb-tile` comes from `AuthBackdrop`
+   so the travel is exactly one pattern tile — that is what makes the loop
+   seamless, since the last frame is identical to the first, one cell over. */
+@keyframes comb-drift {
+	from {
+		transform: translateX(0);
+	}
+	to {
+		transform: translateX(var(--comb-tile, 60px));
+	}
+}
+
+.comb-drift {
+	animation: comb-drift 12s linear infinite;
+	will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.comb-drift {
+		animation: none;
+		will-change: auto;
+	}
+}
+
 /* The field the spoken dialogue is currently asking about. Set imperatively
    from the form as the conversation moves, so the screen follows the voice. */
 [data-voice-active] {
