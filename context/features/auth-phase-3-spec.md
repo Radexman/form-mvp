@@ -28,6 +28,16 @@ The login / register page should be split in two fractions, one is good image of
 - Dropdown/up on avatar click with "Sign out" link
 - Clicking on the icon should go to "/profile"
 
+### Mobile Top Bar
+
+The sidebar footer is `lg`-and-up only, so on phones there is currently no way to
+sign out at all. Mirror the footer's avatar into the mobile top bar:
+
+- Same avatar component, shown only below `lg` (the sidebar keeps it from `lg` up)
+- Same dropdown on tap: "Sign out", and the avatar itself links to `/profile`
+- Sits in the top bar's right-hand action group, before "Dodaj ul"
+- Leave the bottom tab bar alone — it stays navigation-only
+
 ## Notes
 
 ### Avatar Logic
@@ -48,3 +58,4 @@ Create a reusable avatar component that handles both cases.
 5. Click avatar - verify dropdown appears
 6. Click "Sign out" - verify logout and redirect
 7. Go to `/register` - create new account - verify redirect to sign-in
+8. Narrow the viewport below `lg` - verify the avatar appears in the top bar, opens the same dropdown, and signs out

@@ -33,10 +33,9 @@ export default async function DashboardPage() {
 
 	// Proxy already turned away anonymous requests before this ran; this is the
 	// non-optimistic check behind it, and it is what narrows `user.id` for the
-	// query below. It redirects to next-auth's page because `/login` does not
-	// exist — Phase 3 introduces `/sign-in` and this becomes that.
+	// query below.
 	if (!session?.user?.id) {
-		redirect('/api/auth/signin');
+		redirect('/sign-in');
 	}
 
 	// One round trip for the whole page. `Apiary.userId` is `@unique`, which is

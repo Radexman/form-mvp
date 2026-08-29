@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
-import { formatInitials, formatShortName } from '@/app/lib/dashboard';
+import { formatShortName } from '@/app/lib/dashboard';
 import { prisma } from '@/app/lib/prisma';
 
 import { MobileNav } from '../components/dashboard/MobileNav';
@@ -29,10 +29,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
 	// `proxy.ts` already blocks anonymous requests to `/dashboard/*`; that check
 	// is optimistic (it reads the cookie, not the database), so this is the one
-	// that actually gates rendering. `/api/auth/signin` rather than the spec's
-	// `/login`, which does not exist — Phase 3 replaces it with `/sign-in`.
+	// that actually gates rendering.
 	if (!session?.user?.id) {
-		redirect('/api/auth/signin');
+		redirect('/sign-in');
 	}
 
 	// Separate from the page's apiary query on purpose: the plan badge belongs to
@@ -46,8 +45,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 	return (
 		<div className='flex h-dvh w-full flex-col lg:min-h-160 lg:flex-row'>
 			<Sidebar
-				userName={formatShortName(session.user.name ?? null)}
-				userInitials={formatInitials(session.user.name ?? null)}
+				userName={session.user.name ?? null}
+				userShortName={formatShortName(session.user.name ?? null)}
+				userImage={session.user.image ?? null}
 				// No subscription row at all reads as FREE — the seed writes one, but
 				// an account created through `/api/auth/register` has none.
 				isPremium={subscription?.tier === 'PREMIUM'}

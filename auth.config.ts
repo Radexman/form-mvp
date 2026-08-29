@@ -48,6 +48,15 @@ export const credentialsPlaceholder = Credentials({
 });
 
 export default {
+	/**
+	 * Must live here, not in `auth.ts`: the redirect that matters is the one the
+	 * `authorized` callback triggers, and that runs on the Proxy instance built
+	 * from this file alone.
+	 */
+	pages: {
+		signIn: '/sign-in',
+	},
+
 	callbacks: {
 		/**
 		 * Consulted only on the Proxy path, and it is what makes route protection

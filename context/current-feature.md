@@ -1,16 +1,39 @@
-# Current Feature
+# Current Feature: Auth Phase 3 — Sign In, Register & Sign Out UI
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- `/sign-in` — custom page, split in two: an apiary image with an overlay and welcoming text on one side, the credentials form plus "Sign in with Google" on the other. Field-level validation and error display. Links to `/register`.
+- `/register` — same split layout. Name, email, password, confirm password. Validation (email format, passwords match). Posts to `/api/auth/register`, redirects to `/sign-in` on success.
+- A reusable avatar component: Google `image` when the user has one, initials from the name otherwise.
+- Sidebar footer uses that avatar; tapping it opens a dropdown (upward) containing "Sign out". The avatar itself links to `/profile`.
+- The same avatar and dropdown in the mobile top bar below `lg`, so sign-out works on phones for the first time.
+- Every redirect to next-auth's default `/api/auth/signin` points at `/sign-in` instead.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+Spec: `context/features/auth-phase-3-spec.md` (the Mobile Top Bar section was added on user request before starting).
+
+- Phase 2 left explicit Phase-3 markers to clean up: `auth.ts:34`, `app/components/dashboard/Sidebar.tsx:84`, and the two `redirect('/api/auth/signin')` calls in `app/(dashboard)/layout.tsx:35` and `app/(dashboard)/dashboard/page.tsx:39`.
+- Already built and reusable: `signInSchema` / `registerSchema` in `app/lib/auth.schema.ts` (Polish messages, `z.flattenError` for field-keyed errors), `POST /api/auth/register`, `signOutAction` in `app/lib/auth-actions.ts`, `formatInitials` in `app/lib/dashboard.ts`.
+- **No apiary photo exists** — `public/` holds only the Next.js starter SVGs. The image half needs an asset decision.
+- `/profile` does not exist. The spec only asks the avatar to link there; the route itself is out of scope.
+- Phase 2 shipped with **no tests**. `auth.schema.ts` and the register route are still uncovered — fold into `/feature test`.
+- Two recurring traps from earlier phases: a new `'use server'` module and new `@theme` keys are both invisible to a running `next dev`. Restart the server after adding either.
+- UI copy is Polish throughout the dashboard; these pages should match.
+
+### Decisions taken while implementing
+
+- **The avatar is the menu trigger; `/profile` is an item inside the menu.** The spec asks for both a dropdown on avatar click and a click-through to `/profile`, which one element cannot do. `/profile` does not exist yet, so the link carries `prefetch={false}` the way the `/analytics` and `/settings` nav links do.
+- **The mobile account menu reads the session in `Topbar` itself** rather than being threaded from the page. It is a JWT cookie decode, not a query.
+- **`pages.signIn` lives in `auth.config.ts`, not `auth.ts`** — the redirect that matters is the one the `authorized` callback triggers, and that runs on the Proxy instance built from that file alone.
+- **`next.config.ts` had a dead `module.exports`**; `allowedDevOrigins` was never in effect. Folded into the real default export alongside the new `images.remotePatterns` for Google avatars.
+- **Sign-in posts through react-hook-form + a server action**, matching the inspection form, rather than `useActionState`. Register posts to the existing `/api/auth/register` because the spec says so and because 409 vs 400 needs real status codes.
+- **`safeCallbackUrl` is new and tested** — Proxy puts a `?callbackUrl=` on the redirect, and handing that to `redirectTo` unchecked would be an open redirect.
+- **Left panel copy is vertically centred**, on user request mid-implementation.
 
 ## History
 

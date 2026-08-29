@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { signOutAction } from '@/app/lib/auth-actions';
-
-import { HexIcon, SignOutIcon } from './icons';
+import { HexIcon } from './icons';
 import { isNavItemActive, NAV_ITEMS } from './nav';
+import { UserMenu } from './UserMenu';
 
 /**
  * Both states carry a 2px left border — the inactive one transparent — so the
@@ -18,22 +17,24 @@ const NAV_ITEM_ACTIVE = 'border-l-accent bg-accent/5 text-foreground';
 const NAV_ITEM_INACTIVE = 'border-l-transparent text-muted hover:text-foreground';
 
 interface SidebarProps {
+	/** Full name — the menu heading and the initials fallback both need it. */
+	userName: string | null;
 	/** Already shortened by the layout, e.g. "Jan P.". */
-	userName: string;
-	userInitials: string;
+	userShortName: string;
+	userImage: string | null;
 	isPremium: boolean;
 }
 
 /**
- * Desktop only. Below `lg` the same destinations render as `MobileNav`, which
- * has no footer — so the name, plan and sign-out control simply do not exist on
- * phones (`Ustawienia` is the stand-in until Phase 3).
+ * Desktop only. Below `lg` the same destinations render as `MobileNav`, and the
+ * account control this footer holds is mirrored into `Topbar` — the bottom tab
+ * bar stays navigation-only.
  *
  * Still a client component, for `usePathname` only. The session is read by the
  * layout and handed down as props: this file must not reach for `auth()`, which
  * would pull Prisma into the client bundle.
  */
-export function Sidebar({ userName, userInitials, isPremium }: SidebarProps) {
+export function Sidebar({ userName, userShortName, userImage, isPremium }: SidebarProps) {
 	const pathname = usePathname();
 
 	return (
@@ -66,35 +67,14 @@ export function Sidebar({ userName, userInitials, isPremium }: SidebarProps) {
 				})}
 			</nav>
 
-			<div className='flex items-center gap-2.25 border-t border-t-border px-3.5 py-3'>
-				<span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-2 bg-surface-3 text-[11px] font-semibold text-accent'>
-					{userInitials}
-				</span>
-				<span className='flex min-w-0 flex-1 flex-col'>
-					<span className='truncate text-[12px] font-medium text-foreground'>{userName}</span>
-					{/* Premium is the accent green; Free stays muted so the badge reads as
-					    a status rather than as a permanent decoration. */}
-					<span className={`text-[10px] ${isPremium ? 'text-accent' : 'text-muted'}`}>
-						{isPremium ? 'Premium' : 'Free'}
-					</span>
-				</span>
-
-				{/*
-				 * A form, not an onClick — `signOutAction` is a server action and this
-				 * has to be a POST. Phase 3 folds it into a dropdown on the avatar;
-				 * until then it is the only way out of a session short of clearing
-				 * cookies, which is what made testing credentials sign-in awkward.
-				 */}
-				<form action={signOutAction}>
-					<button
-						type='submit'
-						title='Wyloguj się'
-						aria-label='Wyloguj się'
-						className='flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-3 hover:text-foreground'
-					>
-						<SignOutIcon className='h-4 w-4 fill-none stroke-current stroke-[1.8]' />
-					</button>
-				</form>
+			<div className='border-t border-t-border px-2 py-2.5'>
+				<UserMenu
+					variant='sidebar'
+					name={userName}
+					shortName={userShortName}
+					image={userImage}
+					isPremium={isPremium}
+				/>
 			</div>
 		</aside>
 	);
