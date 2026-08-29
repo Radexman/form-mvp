@@ -1,16 +1,76 @@
-# Current Feature
+# Current Feature: Email Verification — Resend
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- `resend` is wired up as a client singleton and a `sendVerificationEmail` helper that reads `RESEND_API_KEY` from the environment only, sending from `onboarding@resend.dev`.
+- Registering through `/api/auth/register` creates the account, stores a fresh single-use verification token, and sends the Polish verification email.
+- After registering, the user lands on a "check your inbox" screen instead of being signed in.
+- Clicking the link hits `GET /api/auth/verify-email?token=…`, marks the account verified, consumes the token, and returns the user to the sign-in page with a success message.
+- A signed-in but unverified credentials user is kept out of `/dashboard/*` and sent to a prompt page that can re-send the email.
+- The sign-in page reports all three outcomes: verified, already used, invalid/expired.
+- Google users and the seeded demo account reach `/dashboard` without ever touching the email flow.
+- Migration applied to the Neon **development** branch; `prisma generate` run explicitly afterwards.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+The spec was written against a generic Next.js/Auth.js app. Most of it transfers, but several concrete details contradict what is actually in this repo. Resolutions below — decide these before writing code, not during.
+
+**Decisions taken at `/feature start`**
+
+- **Google clears the gate by stamping, not by exemption.** An Auth.js `events.linkAccount` handler writes `emailVerified = now()` whenever a Google account is created or linked. The dashboard guard then stays one uniform rule with no provider clause, and the column tells the truth about every row. Fires on the `allowDangerousEmailAccountLinking` path too, which is correct — Google verified that address.
+- **Token lives on `User`:** `verificationToken String? @unique` + `verificationTokenExpiresAt DateTime?`. One token per user, so a re-send overwrites and nothing accumulates. Buys 24h expiry, which the email copy already promises — so expiry *is* enforced, unlike the spec's "not covered" note. Auth.js's own `VerificationToken` table stays free for a future email-link provider.
+- **New `/register/check-email` page; the `?registered=1` banner on `/sign-in` is removed.** A user who cannot sign in yet should not be dropped on a sign-in form, and the page is where the re-send button belongs.
+- **`resolveAppUrl` reads `APP_URL`, falling back to `AUTH_URL` then localhost.** Server-only, no `NEXT_PUBLIC_`.
+
+**Conflicts with the current codebase**
+
+- **`emailVerified` already exists as `DateTime?`** (`prisma/schema.prisma`), written by `@auth/prisma-adapter`. The spec's `Boolean @default(false)` would break the adapter, whose `AdapterUser` types it as `Date | null`. Keep the column as-is and treat `null` = unverified, a timestamp = verified. The migration then only adds the token column(s).
+- **OAuth users have `emailVerified: null`.** Auth Phase 1 established that the Prisma adapter only sets it for email-link flows — Auth.js's Google provider profile does not return it. So a naive `if (!user.emailVerified) redirect(...)` guard **locks every Google user out of the dashboard**. The guard must exempt accounts with no `passwordHash`, or the adapter's `createUser`/`linkAccount` path must stamp `emailVerified` for Google. Pick one deliberately; this is the single most likely way to ship a broken sign-in.
+- **The schema already has a `VerificationToken` model** (Auth.js's, `identifier` + `token` + `expires`). Two options: add `verificationToken String? @unique` to `User` as the spec says, or reuse the existing table. The existing table has the expiry column the spec's own email copy promises ("Link wygasa po 24 godzinach") but never enforces — worth weighing. Note that `@auth/prisma-adapter` owns that table for email-link sign-in, which this app does not use.
+- **There is no `/login`.** Phase 3 shipped `/sign-in`, and `pages.signIn: '/sign-in'` lives in `auth.config.ts`. Every `/login?...` redirect in the spec becomes `/sign-in?...`.
+- **There is no root `lib/`.** This repo has no `src/` and puts shared modules in `app/lib/` (`@/app/lib/prisma`, not `@/lib/prisma`). The new files belong at `app/lib/resend.ts` and `app/lib/email/send-verification-email.ts` — the directory's naming is kebab-case (`auth-actions.ts`, `callback-url.ts`).
+- **The demo user is `demo@getapiary.app`, not `demo@hivewise.app`.** `prisma/seed.ts` line 11. The seed currently writes no `emailVerified`; it needs a timestamp so the demo account keeps working. The spec's raw SQL for Neon Console is unnecessary — re-running the idempotent seed is not enough either, since it skips an existing user, so either update the row or extend the seed's existence branch.
+- **Registration already redirects to `/sign-in?registered=1`** (`RegisterForm.tsx:50`), and `/sign-in` already renders a banner for it. The spec wants `/register/check-email`. Either replace the banner flow or keep it and make the new page the destination — do not end up with both.
+- **`resend@^6.25.0` is already installed** and `RESEND_API_KEY` is already in `.env.local` and `.env.example` (uncommitted working-tree changes). No `npm install` step needed.
+- **`NEXT_PUBLIC_APP_URL` is the wrong prefix.** The URL is only ever built server-side, inside the send helper; `NEXT_PUBLIC_` ships it to the browser bundle for no reason. Use a server-only var (and note `AUTH_URL` may already cover production once the outstanding Vercel fix lands). The verify route itself can derive its redirects from `req.url` and needs no var at all.
+
+**Carried over from earlier phases**
+
+- Run `npx prisma generate` explicitly after the migration and delete `.next/dev`. Auth Phase 1: `prisma migrate dev` applied the migration, reported success, and left the client stale — and no gate (`tsc`, `eslint`, `next build`) caught it.
+- Restart the dev server after adding a new `'use server'` module (the re-send action) — a new server-action module is not picked up by a running `next dev`, and the failure looks like an unrelated null error.
+- Phase 2 and 3 both left `auth.schema.ts` and the register route with **zero test coverage**. This feature adds genuinely testable pure logic — token generation, verification-URL construction, the verified/already/invalid decision. Do not skip `/feature test` a third time.
+
+**Found while building**
+
+- **The spec's two token requirements contradict each other.** It says "consume the token — one-time use" *and* "clicking the link a second time redirects to `?verified=already`". Nulling the token makes the second click indistinguishable from a forged one, which is what the first implementation did — it returned `invalid_token`. The token now stays on the row and `emailVerified` is what makes it inert. A double click is the ordinary case: mail clients and link scanners fetch the URL before the user ever does.
+- **`events.linkAccount` fires only at link time, so it could not fix accounts linked earlier.** Both live accounts on the dev branch had `emailVerified: null` and would have been locked out of `/dashboard` with no way back. Migration `20260829130000_backfill_email_verified` grandfathers every row that existed when verification shipped; everything registered after it must verify.
+- **The `(auth)` group had to split.** Its layout bounced every signed-in visitor to `/dashboard`, which would have made `/verify-email` — the one page in that shell that *requires* a session — an infinite redirect. The shell stays in `app/(auth)/layout.tsx`; the signed-in guard moved down to a new `app/(auth)/(anonymous)/layout.tsx` covering `/sign-in`, `/register` and `/register/check-email`. A session whose user row is gone is let through rather than redirected, or it would bounce against `/verify-email`.
+- **Resend's SDK resolves `{ data, error }` — it does not reject.** `await resend.emails.send(...)` as the spec writes it reports success for a message Resend refused. The helper reads `error` and throws.
+- **`onboarding@resend.dev` only delivers to the API key owner.** Confirmed live: a send to `borderlandsmaniak+ver1@gmail.com` came back "You can only send testing emails to your own email address (borderlandsmaniak@gmail.com)" — plus-aliases are not accepted either. A domain must be verified at resend.com/domains before anyone but the owner can register.
+- **Registration must not fail when the mail does.** Because of the line above, every non-owner registration currently gets a rejected send. The route catches it, still returns 201 with `emailSent: false`, and leaves the stored token for the re-send button — otherwise a mail outage would 500 and the user would retry into a 409 on their own address.
+- **The dashboard layout's two queries became one.** The verification check folded into the existing subscription lookup via a nested select, closing a follow-up left open by Dashboard Spec 2.
+
+**Added mid-feature on request (outside the spec, and gitignored — local-only by user decision)**
+
+- **`scripts/purge-users.ts`** (`npm run db:purge-users`) — deletes every user except `demo@getapiary.app` and everything they own. Dry run by default; `-- --yes` to commit. One `deleteMany` is enough because every user-owned relation is `onDelete: Cascade` from `User`.
+- **`scripts/seed-demo.ts`** (`npm run db:seed-demo`) — `prisma/seed.ts` plus the inspection history it never had: five inspections across the five hives, deliberately covering healthy / queen-unseen / queen-missing-with-swarm-cells / overdue / never-inspected so the dashboard has something to render in every state. Derived scalars (`honeyKg`, `honeySufficiency`, `combCondition`) are computed by importing the app's own `deriveComb` rather than hardcoded, so the seeded rows always agree with what the form would produce. Safe for production: it writes only when `TARGET_DATABASE_URL` is set explicitly and refuses to run there without a `DEMO_PASSWORD`, so the hardcoded `demo1234` can never reach prod.
+
+`/scripts` is in `.gitignore`, so both live only on this checkout. The `db:purge-users` and `db:seed-demo` entries in `package.json` *are* committed and will point at missing files anywhere else — worth remembering before anyone clones this.
+
+**Email design (replaces the spec's light-themed markup)**
+
+- The message now carries the auth screens' honeycomb on the brand's dark palette instead of the spec's white card. `public/email/comb-backdrop.png` is that backdrop **rasterised** — 600x800, 88 KB, quantised to 64 colours, generated by screenshotting the same geometry `AuthBackdrop.tsx` uses (tile 60 x 34.64, `SIDE = 20`). No email client renders an SVG `<pattern>` or runs a CSS animation, so the drift is dropped and the comb is flat by necessity, which is what was wanted anyway.
+- **`bgcolor` is the load-bearing part.** Gmail and Outlook block remote images by default, so the cell declares `bgcolor="#0a0c0a"` alongside `background-image`; without it the light text would land on white. The `background` HTML attribute is there for Outlook's Word engine, which ignores the CSS property.
+- **The image is absolute, built from `resolveAppUrl()`.** With `APP_URL` unset it points at `http://localhost:3000`, which no mail client can reach — the pattern only appears once the app is deployed and `APP_URL` names a public host. Until then every recipient sees the flat dark fallback.
+- Full `<!doctype html>` document with `color-scheme: dark`, so Gmail and Outlook.com do not force-invert a design that is already dark. Tables and inline styles throughout — Gmail drops `<style>` blocks.
+
+**Out of scope (spec's own list, plus)**
+
+Token expiry enforcement, email change / re-verification, OAuth providers, and rate limiting on the re-send action. The last one is worth a second look: the prompt page's button triggers an unauthenticated-adjacent email send, which is the classic spam vector.
 
 ## History
 

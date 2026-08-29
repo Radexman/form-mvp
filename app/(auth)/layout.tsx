@@ -1,24 +1,16 @@
-import { redirect } from 'next/navigation';
-
 import { AuthBackdrop } from '@/app/components/auth/AuthBackdrop';
 import { AuthShowcase } from '@/app/components/auth/AuthShowcase';
 import { HexIcon } from '@/app/components/dashboard/icons';
-import { auth } from '@/auth';
 
 /**
- * Shell for `/sign-in` and `/register`. `min-h-dvh`, not `h-dvh`: there is no
- * inner scroll container, so a fixed height would clip the register form on a
- * landscape phone with nothing able to scroll.
+ * Shell only — the signed-in redirect lives in the nested `(anonymous)` layout,
+ * because `/verify-email` sits in this group and is reachable *while* signed in.
+ *
+ * `min-h-dvh`, not `h-dvh`: there is no inner scroll container, so a fixed
+ * height would clip the register form on a landscape phone with nothing able to
+ * scroll.
  */
-export default async function AuthLayout({ children }: { children: React.ReactNode }) {
-	// Proxy only matches `/dashboard/*`, so nothing above this turns away a
-	// signed-in user arriving from a bookmark or the back button.
-	const session = await auth();
-
-	if (session?.user) {
-		redirect('/dashboard');
-	}
-
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
 	return (
 		// `relative` anchors the absolutely positioned backdrop.
 		<div className='relative flex min-h-dvh w-full'>

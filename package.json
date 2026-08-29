@@ -16,7 +16,9 @@
 		"db:deploy": "prisma migrate deploy",
 		"db:seed": "prisma db seed",
 		"db:studio": "prisma studio",
-		"db:create-account": "tsx prisma/create-account.ts"
+		"db:create-account": "tsx prisma/create-account.ts",
+		"db:purge-users": "tsx scripts/purge-users.ts",
+		"db:seed-demo": "tsx scripts/seed-demo.ts"
 	},
 	"dependencies": {
 		"@ark-ui/react": "^5.37.0",
@@ -31,6 +33,7 @@
 		"react": "19.2.4",
 		"react-dom": "19.2.4",
 		"react-hook-form": "^7.77.0",
+		"resend": "^6.25.0",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {

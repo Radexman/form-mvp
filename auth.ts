@@ -81,6 +81,33 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 		}),
 	],
 
+	events: {
+		/**
+		 * Google verifies every address it returns, so an OAuth account clears the
+		 * verification gate the moment it is linked. Without this the adapter would
+		 * leave `emailVerified` null — it only sets it for email-link flows — and
+		 * the dashboard guard would lock out every Google user.
+		 *
+		 * Also fires on the `allowDangerousEmailAccountLinking` path, where someone
+		 * who registered with a password later uses the Google button; any pending
+		 * token of theirs is dropped here rather than left live.
+		 */
+		async linkAccount({ user }) {
+			if (!user.id) {
+				return;
+			}
+
+			await prisma.user.update({
+				where: { id: user.id },
+				data: {
+					emailVerified: new Date(),
+					verificationToken: null,
+					verificationTokenExpiresAt: null,
+				},
+			});
+		},
+	},
+
 	callbacks: {
 		// Spread first: a bare `callbacks: {…}` after `...authConfig` would replace
 		// the object wholesale and silently drop `authorized`.
