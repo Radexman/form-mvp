@@ -1,39 +1,16 @@
-# Current Feature: Auth Phase 3 — Sign In, Register & Sign Out UI
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- `/sign-in` — custom page, split in two: an apiary image with an overlay and welcoming text on one side, the credentials form plus "Sign in with Google" on the other. Field-level validation and error display. Links to `/register`.
-- `/register` — same split layout. Name, email, password, confirm password. Validation (email format, passwords match). Posts to `/api/auth/register`, redirects to `/sign-in` on success.
-- A reusable avatar component: Google `image` when the user has one, initials from the name otherwise.
-- Sidebar footer uses that avatar; tapping it opens a dropdown (upward) containing "Sign out". The avatar itself links to `/profile`.
-- The same avatar and dropdown in the mobile top bar below `lg`, so sign-out works on phones for the first time.
-- Every redirect to next-auth's default `/api/auth/signin` points at `/sign-in` instead.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-Spec: `context/features/auth-phase-3-spec.md` (the Mobile Top Bar section was added on user request before starting).
-
-- Phase 2 left explicit Phase-3 markers to clean up: `auth.ts:34`, `app/components/dashboard/Sidebar.tsx:84`, and the two `redirect('/api/auth/signin')` calls in `app/(dashboard)/layout.tsx:35` and `app/(dashboard)/dashboard/page.tsx:39`.
-- Already built and reusable: `signInSchema` / `registerSchema` in `app/lib/auth.schema.ts` (Polish messages, `z.flattenError` for field-keyed errors), `POST /api/auth/register`, `signOutAction` in `app/lib/auth-actions.ts`, `formatInitials` in `app/lib/dashboard.ts`.
-- **No apiary photo exists** — `public/` holds only the Next.js starter SVGs. The image half needs an asset decision.
-- `/profile` does not exist. The spec only asks the avatar to link there; the route itself is out of scope.
-- Phase 2 shipped with **no tests**. `auth.schema.ts` and the register route are still uncovered — fold into `/feature test`.
-- Two recurring traps from earlier phases: a new `'use server'` module and new `@theme` keys are both invisible to a running `next dev`. Restart the server after adding either.
-- UI copy is Polish throughout the dashboard; these pages should match.
-
-### Decisions taken while implementing
-
-- **The avatar is the menu trigger; `/profile` is an item inside the menu.** The spec asks for both a dropdown on avatar click and a click-through to `/profile`, which one element cannot do. `/profile` does not exist yet, so the link carries `prefetch={false}` the way the `/analytics` and `/settings` nav links do.
-- **The mobile account menu reads the session in `Topbar` itself** rather than being threaded from the page. It is a JWT cookie decode, not a query.
-- **`pages.signIn` lives in `auth.config.ts`, not `auth.ts`** — the redirect that matters is the one the `authorized` callback triggers, and that runs on the Proxy instance built from that file alone.
-- **`next.config.ts` had a dead `module.exports`**; `allowedDevOrigins` was never in effect. Folded into the real default export alongside the new `images.remotePatterns` for Google avatars.
-- **Sign-in posts through react-hook-form + a server action**, matching the inspection form, rather than `useActionState`. Register posts to the existing `/api/auth/register` because the spec says so and because 409 vs 400 needs real status codes.
-- **`safeCallbackUrl` is new and tested** — Proxy puts a `?callbackUrl=` on the redirect, and handing that to `redirectTo` unchecked would be an open redirect.
-- **Left panel copy is vertically centred**, on user request mid-implementation.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -210,3 +187,36 @@ Email/password sign-in alongside Google OAuth, the registration endpoint behind 
 **Verified** against the Neon **development** branch. Seeded state: `5 uli · brak przeglądów · 0 wymaga uwagi`, `5 uli wielkopolskich`, five cards with empty dots, no alerts section, sidebar `JP` / `Jan P.` / `Premium` — every acceptance criterion the spec lists, with its demo address corrected. With temporary inspections covering every branch (created, checked, deleted): a missing queen produced a red `Alarm` whose reason beat the swarm cells on the same hive, `not_seen_brood_ok` produced amber, a 30-day-old inspection produced `Przegląd przeterminowany · 30 dni`, and 16/8/12/20 frames produced 4/2/3/5 dots. A throwaway account with no apiary rendered the empty state with a muted `Free` badge, confirming the no-subscription branch. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (236 tests) and `next build` all green.
 
 **Left open:** **production still shows the empty state** — the prod demo account was created through `/api/auth/register`, so it has no subscription, apiary or hives, and the prod Google user has none either. Backfill with `db:create-account` or the seed before demoing prod. `/onboarding` still does not exist, so nothing turns the empty state into an apiary; `Dodaj ul` and `Nowy przegląd` remain inert, as do `Szczegóły` and `Przegląd`. The mobile layout has no sidebar footer, so name, plan and sign-out are desktop-only. Hive labels sort lexicographically. The layout's subscription lookup is a second query per request alongside the page's apiary query — fine at this size, worth folding into one if the shell grows. Google sign-in on prod is still broken pending the `AUTH_URL` / redirect-URI fix recorded in Auth Phase 1.
+
+### Auth Phase 3 — Sign In, Register & Sign Out UI — completed 2026-08-29
+
+Custom `/sign-in` and `/register` replacing next-auth's built-in pages, a reusable avatar, and an account dropdown that finally exists on mobile. Merged to `main` as `7ddc015` (feature commit `e314bd6`).
+
+**Delivered**
+
+- `app/(auth)/` — shared split-screen shell plus both pages. The layout also bounces a signed-in visitor to `/dashboard`: Proxy only matches `/dashboard/*`, so nothing above it turns away someone arriving from a bookmark or the back button.
+- `AuthBackdrop` — the drifting honeycomb, wash and scrims. `AuthShowcase` — the `lg`-only brand copy.
+- `app/components/auth/` — `SignInForm`, `RegisterForm`, `GoogleButton`, and a small `fields.tsx` vocabulary built on Ark UI's `Field`.
+- `app/components/ui/Avatar.tsx` — Google photo, initials fallback, plus recovery from a photo URL that 404s.
+- `app/components/dashboard/UserMenu.tsx` — one Ark UI menu in two variants: the sidebar footer row, and an avatar-only trigger in `Topbar` below `lg`.
+- `app/lib/callback-url.ts` + 11 tests. Suite 236 → 247.
+- `auth.config.ts` gains `pages.signIn`; both `redirect('/api/auth/signin')` calls now point at `/sign-in`.
+- `next.config.ts` — `images.remotePatterns` for `lh3.googleusercontent.com/a/**`.
+- `context/coding-standards.md` — a new **Comments** rule, on user request.
+
+**Decisions worth remembering**
+
+- **`pages.signIn` belongs in `auth.config.ts`, not `auth.ts`.** The redirect that matters is the one the `authorized` callback fires, and that runs on the Proxy instance, which is built from `auth.config.ts` alone. Putting it in `auth.ts` would leave Proxy still sending people to `/api/auth/signin`.
+- **`signIn()` throws on both outcomes.** Success calls `redirect()`, which throws `NEXT_REDIRECT`; failure throws `AuthError`. The catch must return only for `AuthError` and rethrow everything else, or the navigation is swallowed and the form appears to do nothing. Confirmed in `@auth/core`: with `raw` set, `isAuthError && isRaw && !isRedirect` rethrows.
+- **Sign-out from a menu item uses `requestSubmit()` on a form rendered *outside* the menu content.** Selecting an item closes the menu, and a submit button the menu is hiding in the same tick is not something to depend on. `lazyMount` + `unmountOnExit` are on for a second reason: below `lg` both `UserMenu` variants mount (the sidebar's inside a `display:none` aside), so the panel markup would otherwise sit in the document twice.
+- **The comb is rendered exactly once.** It is an SVG `<pattern>` referenced by `url(#auth-comb)`; the obvious "one backdrop per column" approach would put two elements with the same id in one document. Hence one absolutely positioned layer, `w-full` on phones and `lg:w-1/2` above.
+- **The drift travels exactly one pattern tile.** That is what makes the loop seamless — the last frame is pixel-identical to the first, one cell over. `--comb-tile` is set inline from the same constant that builds the pattern, so the keyframes in `globals.css` cannot fall out of step. The svg is a tile wider than its box and offset left by a tile, so `overflow-hidden` on the parent is load-bearing: without it the overhang becomes horizontal page scroll.
+- **The avatar is the menu trigger and `/profile` is an item inside it.** The spec asked for both a dropdown on avatar click and a click-through to `/profile`; one element cannot do both.
+- **`next.config.ts` had a dead `module.exports = {…}`.** `allowedDevOrigins` was never in effect — the config loader reads the default export, and `export default` compiles to `exports.default` on the object `module.exports` had just replaced. Phone-on-LAN dev access should work now for the first time.
+- **`safeCallbackUrl` rejects `/\evil.example` as well as `//evil.example`** — browsers normalise the backslash and read both as another host, and a naive `startsWith('//')` misses the second form.
+- **Register posts to the route handler, not a server action.** 409-for-taken vs 400-for-invalid is the contract Phase 2 tested, and the repo's standards put anything needing specific status codes in a route handler.
+- **`Topbar` is async and reads the session itself** rather than taking it as a prop, so no page that renders a topbar has to thread the user through. A JWT cookie decode, not a query.
+
+**Verified** in the browser at 1440×900, 1280, 1024 and 390×844 against the Neon **development** branch: empty-form validation, a wrong password producing one generic message, a correct password reaching `/dashboard`, `/dashboard` while signed out redirecting to `/sign-in?callbackUrl=…`, `/sign-in` while signed in redirecting to `/dashboard`, register with mismatched passwords, a duplicate address landing its 409 on the email field, a new account redirecting to `/sign-in?registered=1` with the confirmation banner, and signing in afterwards with the lowercased form of an address registered with mixed case and a trailing space. Sign-out works from both the sidebar and the mobile top bar. A Google avatar loaded through `/_next/image` (32px decoded), and a deliberately broken URL fell back to initials. The drift was measured seamless: `translateX(59.997px)` at 11999ms, `translateX(0)` at the wrap. No horizontal overflow at any width. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (247 tests) and `next build` all green.
+
+**Left open:** **`/profile` does not exist**, so the menu item 404s — it carries `prefetch={false}` like the `/analytics` and `/settings` nav links. **No tests for `auth.schema.ts` or the register route** — Phase 2's gap is still open; only `callback-url.ts` gained coverage. `callbackUrl` deep links are dropped rather than honoured: next-auth writes an absolute URL and `safeCallbackUrl` accepts only relative paths, so everything lands on `/dashboard`. Harmless while `/dashboard` is the only protected page; revisit when `/dashboard/hive/:id` exists. The apiary image half is still CSS art — drop a photo in `public/` and render an `<Image fill>` under the scrims. **The dev server logs sign-in passwords in plaintext** (`ƒ signInAction({"email":…,"password":…})`) — Next 16 traces server-action arguments in dev; switching the action to `FormData` would hide it. Google sign-in on prod is still broken pending the `AUTH_URL` / redirect-URI fix from Auth Phase 1, and production still shows the empty dashboard state. **Turbopack served stale CSS** after an edit to `globals.css` and needed a dev-server restart — add that to the `@theme` and `'use server'` staleness list.
