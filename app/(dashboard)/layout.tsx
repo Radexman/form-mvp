@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
 import { formatShortName } from '@/app/lib/dashboard';
+import { isEmailVerificationEnabled } from '@/app/lib/email/config';
 import { prisma } from '@/app/lib/prisma';
 
 import { MobileNav } from '../components/dashboard/MobileNav';
@@ -46,7 +47,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
 	// Google accounts are stamped verified when the account is linked (see the
 	// `linkAccount` event in `auth.ts`), so this needs no provider clause.
-	if (!user.emailVerified) {
+	//
+	// The flag check comes first so that accounts left unverified from a period
+	// when verification was on are not stranded once it is switched off — they
+	// are the whole reason the gate is skipped rather than the stamp being
+	// backfilled here.
+	if (isEmailVerificationEnabled() && !user.emailVerified) {
 		redirect('/verify-email');
 	}
 

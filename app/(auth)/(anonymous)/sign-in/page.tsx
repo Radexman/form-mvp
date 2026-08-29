@@ -9,29 +9,36 @@ export const metadata: Metadata = {
 	title: 'Zaloguj się · Hivewise',
 };
 
-/** Set by the redirects out of `/api/auth/verify-email`. */
-const VERIFICATION_NOTICES = {
+/** Set by the redirects out of `/api/auth/verify-email`, and by the register form. */
+const NOTICES = {
 	true: { tone: 'ok', text: 'E-mail potwierdzony. Możesz się teraz zalogować.' },
 	already: { tone: 'ok', text: 'Ten link był już użyty. Zaloguj się.' },
 	invalid_token: { tone: 'error', text: 'Link jest nieprawidłowy lub wygasł. Zaloguj się i wyślij nowy.' },
+	// Where the register form lands when email verification is switched off, so
+	// there is no `/register/check-email` step between account and sign-in.
+	registered: { tone: 'ok', text: 'Konto zostało utworzone. Możesz się teraz zalogować.' },
 } as const;
 
-function verificationNotice(verified?: string, error?: string) {
+function pageNotice(verified?: string, error?: string, registered?: string) {
 	if (verified === 'true' || verified === 'already') {
-		return VERIFICATION_NOTICES[verified];
+		return NOTICES[verified];
 	}
 
-	return error === 'invalid_token' ? VERIFICATION_NOTICES.invalid_token : undefined;
+	if (error === 'invalid_token') {
+		return NOTICES.invalid_token;
+	}
+
+	return registered === '1' ? NOTICES.registered : undefined;
 }
 
 /** Replaces next-auth's built-in page; wired up by `pages.signIn` in `auth.config.ts`. */
 export default async function SignInPage({
 	searchParams,
 }: {
-	searchParams: Promise<{ callbackUrl?: string; verified?: string; error?: string }>;
+	searchParams: Promise<{ callbackUrl?: string; verified?: string; error?: string; registered?: string }>;
 }) {
-	const { callbackUrl, verified, error } = await searchParams;
-	const notice = verificationNotice(verified, error);
+	const { callbackUrl, verified, error, registered } = await searchParams;
+	const notice = pageNotice(verified, error, registered);
 
 	return (
 		<>

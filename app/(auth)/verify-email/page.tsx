@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { ResendVerificationButton } from '@/app/components/auth/ResendVerificationButton';
 import { SignOutButton } from '@/app/components/auth/SignOutButton';
 import { MailIcon } from '@/app/components/dashboard/icons';
+import { isEmailVerificationEnabled } from '@/app/lib/email/config';
 import { resendVerificationAction } from '@/app/lib/email/verification-actions';
 import { prisma } from '@/app/lib/prisma';
 import { auth } from '@/auth';
@@ -13,11 +14,25 @@ export const metadata: Metadata = {
 };
 
 /**
+ * Without this the page prerenders: with verification off the flag check below
+ * redirects before any dynamic API is touched, so Next bakes "redirect to
+ * /dashboard" into the build output and switching the flag back on would have
+ * no effect until the next rebuild.
+ */
+export const dynamic = 'force-dynamic';
+
+/**
  * Where the dashboard guard parks a signed-in account that has not clicked its
  * link yet. Lives outside the `(anonymous)` group precisely because it is the
  * one page in this shell that requires a session.
  */
 export default async function VerifyEmailPage() {
+	// With verification off, nothing sends anyone here and the dashboard gate is
+	// open regardless of `emailVerified` — the page has nothing left to ask for.
+	if (!isEmailVerificationEnabled()) {
+		redirect('/dashboard');
+	}
+
 	const session = await auth();
 
 	if (!session?.user?.id) {

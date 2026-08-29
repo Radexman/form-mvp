@@ -13,6 +13,10 @@ interface RegisterErrorBody {
 	fieldErrors?: Partial<Record<keyof RegisterValues, string[]>>;
 }
 
+interface RegisterSuccessBody {
+	verificationRequired?: boolean;
+}
+
 /**
  * Posts to the route handler, not a server action — it already exists and its
  * status codes carry meaning (409 taken vs 400 invalid). Does not sign anyone
@@ -47,6 +51,16 @@ export function RegisterForm() {
 		}
 
 		if (response.ok) {
+			const body: RegisterSuccessBody = await response.json().catch(() => ({}));
+
+			// The server owns the flag; the client only reads the outcome off the
+			// response. With verification off there is no link to wait for, so the
+			// "check your inbox" step would be a dead end.
+			if (body.verificationRequired === false) {
+				router.push('/sign-in?registered=1');
+				return;
+			}
+
 			// The route normalises the address before storing it; re-normalise here
 			// so the confirmation page names the same one the email went to.
 			router.push(`/register/check-email?email=${encodeURIComponent(values.email.trim().toLowerCase())}`);
