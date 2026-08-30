@@ -3,7 +3,7 @@ import NextAuth from 'next-auth';
 import authConfig from './auth.config';
 
 /**
- * Route protection for `/dashboard/*`.
+ * Route protection for the authenticated pages.
  *
  * Built from `auth.config.ts` rather than `auth.ts` so the Prisma client stays
  * out of this file — Proxy runs ahead of every matched request, and the Next
@@ -18,7 +18,9 @@ const { auth } = NextAuth(authConfig);
 export const proxy = auth;
 
 export const config = {
-	// Scoped to the dashboard on purpose. Auth.js suggests running Proxy on all
-	// routes, but `/` and `/api/generate-pdf` are public today.
-	matcher: ['/dashboard/:path*'],
+	// Scoped on purpose. Auth.js suggests running Proxy on all routes, but `/`
+	// and `/api/generate-pdf` are public today. Every page in the `(dashboard)`
+	// group belongs here — the group adds no URL segment, so each of its routes
+	// has to be listed by its own path.
+	matcher: ['/dashboard/:path*', '/profile'],
 };

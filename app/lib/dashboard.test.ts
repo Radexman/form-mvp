@@ -9,6 +9,7 @@ import {
 	deriveQueenStatus,
 	deriveStrength,
 	firstNameOf,
+	formatHiveCount,
 	formatInitials,
 	formatInspectionDate,
 	formatShortName,
@@ -267,5 +268,23 @@ describe('latestInspectionDate', () => {
 		]);
 
 		expect(newest).toEqual(new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000));
+	});
+});
+
+describe('formatHiveCount', () => {
+	it('follows the three Polish plural shapes', () => {
+		expect(formatHiveCount(1)).toBe('1 ul');
+		expect(formatHiveCount(3)).toBe('3 ule');
+		expect(formatHiveCount(5)).toBe('5 uli');
+	});
+
+	it('uses the many form for zero', () => {
+		expect(formatHiveCount(0)).toBe('0 uli');
+	});
+
+	// 22 is "few" in Polish while 12 is not — the rule is not a simple 2-4 test.
+	it('handles the teens and the twenties correctly', () => {
+		expect(formatHiveCount(12)).toBe('12 uli');
+		expect(formatHiveCount(22)).toBe('22 ule');
 	});
 });

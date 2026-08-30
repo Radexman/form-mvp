@@ -1,16 +1,79 @@
-# Current Feature
+# Current Feature: Profile Page
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- `/profile` renders for the signed-in user, protected and unreachable while signed out.
+- Shows account identity: email, name, avatar (Google photo or initials fallback), account creation date.
+- Shows usage stats: apiary count and total hive count.
+- Shows current plan (Free / Premium) and this month's premium-feature usage — PDF generations and AI reports against their limits.
+- Change password, offered only to accounts that have a `passwordHash` (credentials sign-ups), hidden for Google-only accounts.
+- Delete account behind a danger zone: a confirmation dialog requiring the user to type an exact phrase, e.g. `DeleteMyAccount`.
+- Premium accounts are prevented from self-deleting — exact approach to be agreed with the user before implementing.
+- Follows existing patterns: server component + one Prisma query, derivations as pure tested functions in `app/lib/`, route handlers where status codes matter.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+### Where it lives
+
+`/profile` should be `app/(dashboard)/profile/page.tsx`. The `(dashboard)` group adds no URL segment, so the path is right, and the page inherits the shell, the `auth()` guard and the email-verification gate from `app/(dashboard)/layout.tsx` for free. `UserMenu` already links to `/profile` with a `prefetch={false}` TODO to remove once the route exists.
+
+`proxy.ts` matches only `['/dashboard/:path*']`, so Proxy will not cover `/profile`. The layout's own `auth()` call is the real boundary and is enough, but adding `/profile` to the matcher gives it the same optimistic cookie check the dashboard gets.
+
+`Topbar` takes required `apiaryName` / `location` props and is apiary-shaped. The profile page needs its own header, or the topbar needs to become optional-prop — decide during `/start`. Whatever it is must still carry the `lg:hidden` `UserMenu`, or mobile loses sign-out on this page.
+
+### Already built — reuse, do not rewrite
+
+- **Avatar logic is done.** `app/components/ui/Avatar.tsx` already does Google photo → initials fallback, including recovery from a photo URL that 404s. `formatInitials` / `formatShortName` / `firstNameOf` live in `app/lib/dashboard.ts`. The spec's "Avatar logic" requirement is satisfied by rendering `<Avatar>`.
+- **Password rules and the field are done.** `PASSWORD_REQUIREMENTS`, `MIN_PASSWORD_LENGTH` and `resetPasswordSchema` are in `app/lib/auth.schema.ts`; `PasswordField` in `app/components/auth/fields.tsx` renders the reveal toggle and the live requirements checklist. Change-password reuses all of it plus a `currentPassword` field.
+- **Ark UI is the dialog library.** `@ark-ui/react` v5 is already a dependency and `UserMenu` uses `Menu.Root` with `lazyMount` / `unmountOnExit`; `Dialog.Root` follows the same shape. No new dependency.
+- **Route-handler pattern to copy:** `app/api/auth/reset-password/route.ts` — parse JSON in a try, `safeParse`, `z.flattenError` for field errors, `bcrypt` at `BCRYPT_ROUNDS = 10`, `$transaction` for multi-row writes.
+
+### Data — one query covers the whole page
+
+Everything the page shows hangs off `User`: `email`, `name`, `image`, `createdAt`, `passwordHash` (presence only), `subscription` (`tier` / `status` / `currentPeriodEnd`), the current month's `usagePeriods` row, and `apiary` with `_count: { select: { hives: true } }`.
+
+- **`Apiary.userId` is `@unique` — a user has at most one apiary.** "Total apiaries" is therefore always 0 or 1. Render it honestly (the apiary's name, or "brak pasieki") rather than a count that can only be two values; the `@unique` is documented in `context/project-overview.md` as droppable later.
+- **Hive count** is `apiary._count.hives`, not a length — no need to load the rows.
+- **`passwordHash` decides the change-password button**, not the provider. Select it and map it to a boolean before it leaves the server component. A `some` on `Account` would miss a Google user who later set a password through the reset flow, which `app/api/auth/reset-password/route.ts` explicitly allows.
+- **Usage may be missing.** `/api/auth/register` creates no `UsagePeriod` (only `prisma/seed.ts` and `prisma/create-account.ts` do), so most accounts have none for the current month. Absent must render as 0 used, not as an error or a blank.
+- **Limits live in code, not the DB.** `context/project-overview.md` gives working numbers — FREE 15 PDF / 5 AI per month, PREMIUM 50 / 25 — and says explicitly they are configuration, subject to change before launch. Put them in one exported constant, not inline in JSX.
+- **Month boundary:** the seed derives `periodStart` with `Date.UTC` and `gen-demo-sql.ts` uses `date_trunc('month', now() AT TIME ZONE 'UTC')`. Match that, and mind the bug the seed left open — use `getUTCFullYear` / `getUTCMonth`, not the local getters.
+
+### Deleting an account
+
+`onDelete: Cascade` from `User` already reaches `Account`, `Session`, `Subscription`, `UsagePeriod`, `AiReport`, and `Apiary` → `Hive` → `Inspection` → `PdfGenerationJob`. A single `prisma.user.delete` is the whole deletion. Two things it does **not** clean up:
+
+- **`VerificationToken` rows are not related to `User`** — that table is keyed by an `identifier` string. Any outstanding `password-reset:<email>` row survives the delete and would still be spendable if the address is re-registered. Delete by identifier in the same transaction.
+- **The session cookie is a JWT** and cannot be revoked server-side. The delete must be followed by `signOut()`, or the user keeps a valid-looking cookie pointing at a row that is gone. The `(dashboard)` layout already redirects to `/sign-in` when `findUnique` returns null, so the failure mode is contained, but signing out is the correct finish.
+
+Danger-zone confirmation: exact-match typed phrase before the destructive button enables. Keep the phrase a literal constant shared by the client check and the server check — the server must re-verify it, since the endpoint is reachable without the dialog.
+
+### DECIDED — blocking Premium deletion
+
+**Option 3, chosen by the user on 2026-08-30: block only while a subscription is genuinely active** — `subscription.status === 'active' && subscription.stripeSubscriptionId !== null`. A no-op today (no row satisfies it), so Premium-by-seed accounts including the demo stay deletable; it starts biting the moment Stripe lands in Phase 4. Non-blocked Premium accounts get option 2's wording — the dialog says deleting forfeits the remaining paid period — and still type the phrase. The server re-checks the same condition and answers 409.
+
+Original framing, kept for the record:
+
+The spec says "prevent premium users from deleting their accounts... consult best approaches with me when working." Worth raising before implementing, because **Stripe does not exist yet** — billing is Phase 4 in `context/project-overview.md`, `Subscription.stripeSubscriptionId` is null on every row, and `tier: PREMIUM` today is only set by the seed and `create-account.ts`. So there is no subscription to cancel and nothing that would keep billing a deleted user.
+
+Options to put to the user at `/start`:
+
+1. **Hard block** — Premium users cannot delete; the danger zone says "cancel your subscription first". Simplest, and matches the spec's literal wording. Risk: with no cancel flow built, a Premium user is permanently unable to delete their account, which is a GDPR / consumer-rights problem in the EU — and the demo account is Premium.
+2. **Warn, then allow** — the dialog states that deleting forfeits the remaining paid period, and requires the typed phrase anyway. Standard practice, keeps the right-to-erasure path open.
+3. **Block only while a subscription is genuinely active** — `status === 'active' && stripeSubscriptionId !== null`, so the block does nothing until Stripe actually lands and Premium-by-seed accounts stay deletable. Revisit with a proper "cancel then delete" flow in Phase 4.
+
+Recommendation is 3 as the shape, with 2's wording. The user's call.
+
+### Other
+
+- Copy is Polish throughout (`Wyloguj się`, `Nie pamiętasz hasła?`, …). Match it.
+- Any change-password or delete endpoint should be a **route handler**, not a server action: Next 16 traces server-action arguments in the dev console in plaintext — the reason `/api/auth/reset-password` is a route handler, and the bug `signInAction` still carries.
+- No rate limiting exists anywhere in this codebase; a change-password endpoint that verifies a current password is another brute-force surface. Consistent with what is already open, but note it.
+- Dev-server staleness traps from previous features apply: restart `next dev` after adding a new `'use server'` module, a new `@theme` key, or an edit to `globals.css`.
 
 ## History
 

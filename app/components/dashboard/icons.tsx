@@ -183,3 +183,75 @@ export function EyeOffIcon({ className }: { className?: string }) {
 		</svg>
 	);
 }
+
+/** Lidded bin — the delete-account control in the danger zone. */
+export function TrashIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox='0 0 24 24'
+			aria-hidden='true'
+			className={className}
+		>
+			<polyline points='4,7 20,7' />
+			<path d='M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2' />
+			<path d='M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7' />
+			<line
+				x1='10'
+				y1='11'
+				x2='10'
+				y2='17'
+			/>
+			<line
+				x1='14'
+				y1='11'
+				x2='14'
+				y2='17'
+			/>
+		</svg>
+	);
+}
+
+/** Padlock — heads the password section. */
+export function LockIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox='0 0 24 24'
+			aria-hidden='true'
+			className={className}
+		>
+			<rect
+				x='4'
+				y='10'
+				width='16'
+				height='11'
+				rx='2'
+			/>
+			<path d='M8 10V7a4 4 0 0 1 8 0v3' />
+		</svg>
+	);
+}
+
+/** Exclamation in a triangle — warnings that are not yet failures. */
+export function WarningIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox='0 0 24 24'
+			aria-hidden='true'
+			className={className}
+		>
+			<path d='M12 4 2.5 20h19L12 4Z' />
+			<line
+				x1='12'
+				y1='10'
+				x2='12'
+				y2='14'
+			/>
+			<line
+				x1='12'
+				y1='17'
+				x2='12'
+				y2='17'
+			/>
+		</svg>
+	);
+}

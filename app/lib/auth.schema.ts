@@ -161,3 +161,36 @@ export const resetPasswordRequestSchema = z
 		...confirmedPassword,
 	})
 	.refine(passwordsMatch, passwordMismatch);
+
+/**
+ * Changing a password from inside the account, which the reset flow is not:
+ * there is no emailed proof here, so the current password is the proof, and it
+ * is checked for presence only for the same reason `signInSchema` is — an
+ * existing password predating a rule change still has to be typeable.
+ *
+ * `newPassword` is the same `confirmedPassword` pair the reset uses, so the two
+ * ways of setting a password cannot disagree about what a good one is.
+ */
+export const changePasswordSchema = z
+	.object({
+		currentPassword: z.string().min(1, 'Podaj aktualne hasło'),
+		...confirmedPassword,
+	})
+	.refine(passwordsMatch, passwordMismatch)
+	.refine((values) => values.currentPassword !== values.password, {
+		message: 'Nowe hasło musi różnić się od aktualnego',
+		path: ['password'],
+	});
+
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
+
+/**
+ * The typed phrase behind account deletion. Only presence is validated here —
+ * whether it *matches* is `isDeleteConfirmed`'s job in `profile.ts`, so the
+ * literal lives in one place rather than being duplicated into a Zod literal.
+ */
+export const deleteAccountSchema = z.object({
+	confirmation: z.string().min(1, 'Wpisz frazę potwierdzającą'),
+});
+
+export type DeleteAccountValues = z.infer<typeof deleteAccountSchema>;

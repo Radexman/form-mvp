@@ -79,12 +79,8 @@ export function UserMenu({ name, shortName, image, variant, isPremium = false, c
 								value='profile'
 								asChild
 							>
-								{/* TODO: drop `prefetch={false}` once /profile exists — until then
-								    the router prefetches a 404 the moment the menu opens.
-								    Matches how the nav links treat /analytics and /settings. */}
 								<Link
 									href='/profile'
-									prefetch={false}
 									className={ITEM}
 								>
 									<UserIcon className='h-4 w-4 shrink-0 fill-none stroke-current stroke-[1.8]' />

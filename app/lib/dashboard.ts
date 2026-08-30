@@ -199,6 +199,11 @@ function needsAttentionVerb(count: number): string {
 	return PLURAL.select(count) === 'few' ? 'wymagają' : 'wymaga';
 }
 
+/** "1 ul" / "3 ule" / "5 uli" — the noun alone, for anywhere outside a summary. */
+export function formatHiveCount(count: number): string {
+	return `${count} ${hiveNoun(count)}`;
+}
+
 /** Adjective forms agreeing with `hiveNoun`. Eponymous types do not decline. */
 const HIVE_TYPE_ADJECTIVE: Record<HiveType, { few: string; many: string }> = {
 	WIELKOPOLSKI: { few: 'wielkopolskie', many: 'wielkopolskich' },
@@ -210,7 +215,7 @@ const HIVE_TYPE_ADJECTIVE: Record<HiveType, { few: string; many: string }> = {
 };
 
 export function buildSummaryLine(totalHives: number, lastInspectionDate: Date | null, alertCount: number): string {
-	const hives = `${totalHives} ${hiveNoun(totalHives)}`;
+	const hives = formatHiveCount(totalHives);
 	const last = lastInspectionDate ? `ostatni przegląd ${formatInspectionDate(lastInspectionDate)}` : 'brak przeglądów';
 	const alerts = `${alertCount} ${needsAttentionVerb(alertCount)} uwagi`;
 
