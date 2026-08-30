@@ -1,16 +1,67 @@
-# Current Feature
+# Current Feature: Forgot Password
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- **`/forgot-password`** (in the `(auth)/(anonymous)` group) — one email field. Always answers with the same confirmation, whether or not the address exists.
+- **`/reset-password?token=…`** — new password + confirm, validated against the same rules `registerSchema` enforces. Invalid, expired, consumed or missing token renders a dead-end state with a link back to `/forgot-password`, not a form.
+- **Reset tokens live in the existing `VerificationToken` table** (`identifier` / `token` / `expires`), not in new `User` columns — so no migration, and a user can hold a reset token and an email-verification token at once.
+- **Request step** — mint a token, store it, mail the link. Same write-then-send order as `issueVerificationEmail`.
+- **Consume step** — verify the token, `bcrypt.hash` the new password at cost 10, write `passwordHash`, **delete the token row**, redirect to `/sign-in` with a success notice.
+- **Reset-password email** — a second template beside `verificationEmailHtml`, same tables/inline-styles/PNG-backdrop construction and the same `{ data, error }` handling.
+- **"Nie pamiętasz hasła?"** link on `/sign-in`, and a new entry in that page's `NOTICES` map for the post-reset banner.
+- **Schemas in `app/lib/auth.schema.ts`** — `forgotPasswordSchema` (the shared `email` pipe) and `resetPasswordSchema` reusing the existing password rules and the confirm-password refinement.
+- **Tests** for the token helpers and the schemas. Suite is at 288.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+### The model is empty, and that is the point
+
+`VerificationToken` is declared in `prisma/schema.prisma` and its table was created by `20260828141044_init`, but **no app code has ever read or written it** — the email-verification feature stored its token in `User.verificationToken` / `verificationTokenExpiresAt` instead. This feature is its first consumer. **No migration is needed**, and by the same token nothing about the existing verification flow may be moved into it as a drive-by.
+
+It is Auth.js's table, though: `@auth/prisma-adapter` writes `identifier` = the user's email for email-link (magic link) sign-in. That provider is not configured, so the table is free today — but a bare email as `identifier` would collide the day it is. **Namespace the identifier** (`password-reset:<email>`, or the user id under a prefix) so the two kinds can never be confused, and always filter on that prefix when reading.
+
+### Where this must differ from email verification
+
+- **Single use — delete the row on consumption.** The verification token deliberately *stays* on the row, because `emailVerified` is what makes it inert and a double click is the ordinary case. A reset token has no equivalent natural inertness: leaving it live would let anyone who later reads the link (mail archive, forwarded thread, browser history) set the password again. Delete it in the same transaction as the password write.
+- **Short TTL.** `VERIFICATION_TOKEN_TTL_MS` is 24h; a reset link should be ~1h. Do not reuse the constant.
+- **Mint fresh, and drop any previous reset token for that identifier first.** Two live links is one more than intended.
+
+### Decisions to make deliberately, not by accident
+
+- **OAuth-only accounts (`passwordHash: null`).** Phase 2 refused to let `/api/auth/register` set a password on an existing Google row, because that hands the account to anyone who knows the address. Reset is different — it proves control of the mailbox — but it is still a policy choice, so make it explicitly and record it either way.
+- **Does a successful reset stamp `emailVerified`?** Clicking the link proves the same thing the verification link proves. If it does not, someone can reset their password and still land on `/verify-email`.
+- **Sessions are JWTs and cannot be revoked.** A reset does not sign out an attacker who already holds a valid cookie. Note the limitation; do not build session invalidation for it here.
+- **Account enumeration.** `/forgot-password` must answer identically for known and unknown addresses — the opposite of the register route's deliberate 409. Watch the timing too: hashing and mailing only in the found branch is itself a signal, though this is the same gap already accepted in `resendVerificationForEmailAction`.
+
+### What to reuse verbatim
+
+- `app/lib/resend.ts` → `getResend()`, lazy. Resend's SDK **resolves `{ data, error }`, it does not reject** — a bare `await` reports success for a refused message.
+- `resolveAppUrl()` from `verification-token.ts` for the link base, and `randomBytes(32).toString('hex')` for the token.
+- `send-verification-email.ts` for the email's shape: tables, fully inlined CSS, `bgcolor` beside `background-image` (images are blocked by default), the `color-scheme` metas, and `public/email/comb-backdrop.png`.
+- `app/components/auth/fields.tsx` for the form vocabulary, `RegisterForm.tsx` for the submit/error pattern.
+- `SignInForm`'s handling of Zod `z.flattenError` field-keyed messages. Polish copy throughout.
+
+### Environment and delivery reality
+
+`FROM` is a hardcoded `onboarding@resend.dev`, Resend's sandbox sender: **it only delivers to the API key owner and rejects plus-aliases.** So a send failure must not lose the token — store first, and let the user retry. Vercel still lacks `RESEND_API_KEY` and `APP_URL`; without `APP_URL` the link points at `localhost:3000`.
+
+`EMAIL_VERIFICATION_ENABLED` should **not** gate this flow — password reset is not email verification, and gating it would leave accounts with no recovery path whenever the flag is off. Decide it once and say so in the code.
+
+### Traps this repo has already paid for
+
+- **Restart `next dev` after adding a new `'use server'` module** or a new `@theme` key — both go unregistered in a running server and fail in ways that look like broken code. Turbopack has also served stale `globals.css`.
+- **Never run two `next dev` processes** — they share `.next` and corrupt each other.
+- **The dev server logs server-action arguments in plaintext**, so a password submitted through an action shows up in the terminal. `FormData` avoids it.
+- Any page whose only env- or token-dependent branch short-circuits before touching `auth()` or `searchParams` will **prerender**; `/reset-password` reads `searchParams`, so it is dynamic, but check the build output (`ƒ` vs `○`) rather than assuming.
+- Paths in specs are often `src/`-prefixed; **this repo has no `src/`**.
+
+### Still open from earlier phases, and relevant here
+
+**No rate limiting anywhere** — `/forgot-password` is the classic mail-spam vector and joins two unthrottled re-send actions. **No tests for `auth.schema.ts` or the register route**, open since Phase 2; this feature touches that file, so it is the natural moment to close the gap.
 
 ## History
 

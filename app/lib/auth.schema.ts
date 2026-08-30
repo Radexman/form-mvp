@@ -32,7 +32,7 @@ export const signInSchema = z.object({
 
 export type SignInValues = z.infer<typeof signInSchema>;
 
-export const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 12;
 
 /**
  * bcrypt hashes at most 72 *bytes* and silently discards the rest, so two
@@ -40,6 +40,96 @@ export const MIN_PASSWORD_LENGTH = 8;
  * is measured in bytes, not characters — "ą" costs two.
  */
 const MAX_PASSWORD_BYTES = 72;
+
+/**
+ * The rules a new password must satisfy, paired with the label the form shows.
+ * One list drives both the Zod checks and the on-screen checklist, so the two
+ * cannot drift into telling the user different things.
+ *
+ * Letter classes use Unicode property escapes rather than `[A-Z]`: this is a
+ * Polish app, and `Ą` has to count as a capital.
+ */
+export const PASSWORD_REQUIREMENTS = [
+	{
+		label: `Co najmniej ${MIN_PASSWORD_LENGTH} znaków`,
+		message: `Hasło musi mieć co najmniej ${MIN_PASSWORD_LENGTH} znaków`,
+		test: (value: string) => value.length >= MIN_PASSWORD_LENGTH,
+	},
+	{
+		label: 'Wielka i mała litera',
+		message: 'Hasło musi zawierać wielką i małą literę',
+		test: (value: string) => /\p{Lu}/u.test(value) && /\p{Ll}/u.test(value),
+	},
+	{
+		label: 'Co najmniej jedna cyfra',
+		message: 'Hasło musi zawierać co najmniej jedną cyfrę',
+		test: (value: string) => /\d/.test(value),
+	},
+] as const;
+
+/**
+ * Rejecting known-weak bases is the one rule NIST SP 800-63B actually endorses;
+ * the composition rules above are the ones it warns push people towards
+ * `Passwordi1`. Matching on a *substring* is deliberate — `Haslo123456` passes
+ * every check above and is exactly what this is here to stop. Includes the
+ * words this app puts in a beekeeper's head.
+ */
+const WEAK_BASES = [
+	'password',
+	'passw0rd',
+	'haslo',
+	'hasło',
+	'qwerty',
+	'123456',
+	'iloveyou',
+	'admin',
+	'letmein',
+	'welcome',
+	'monkey',
+	'dragon',
+	'abc123',
+	'zaq12wsx',
+	'hivewise',
+	'pasieka',
+	'pszczoly',
+	'pszczoły',
+];
+
+/**
+ * The rules for a password being *set* — registration and password reset both
+ * write to the same `passwordHash` column, so they must agree. `signInSchema`
+ * deliberately does not use this: an existing password predating a rule change
+ * still has to be accepted.
+ */
+const newPassword = z.string().superRefine((value, ctx) => {
+	for (const requirement of PASSWORD_REQUIREMENTS) {
+		if (!requirement.test(value)) {
+			ctx.addIssue({ code: 'custom', message: requirement.message });
+		}
+	}
+
+	if (new TextEncoder().encode(value).length > MAX_PASSWORD_BYTES) {
+		ctx.addIssue({ code: 'custom', message: 'Hasło jest za długie' });
+	}
+
+	const lowered = value.toLowerCase();
+
+	if (WEAK_BASES.some((base) => lowered.includes(base))) {
+		ctx.addIssue({ code: 'custom', message: 'Hasło zawiera zbyt popularne słowo — wybierz inne' });
+	}
+});
+
+const confirmedPassword = { password: newPassword, confirmPassword: z.string() };
+
+const passwordsMatch = (values: { password: string; confirmPassword: string }) =>
+	values.password === values.confirmPassword;
+
+const passwordMismatch = {
+	message: 'Hasła nie są identyczne',
+	// Attaches the error to the second field, which is the one the user can fix
+	// without retyping both.
+	path: ['confirmPassword'],
+};
 
 export const registerSchema = z
 	.object({
@@ -49,17 +139,25 @@ export const registerSchema = z
 			.min(2, 'Imię musi mieć co najmniej 2 znaki')
 			.max(100, 'Imię może mieć maksymalnie 100 znaków'),
 		email,
-		password: z
-			.string()
-			.min(MIN_PASSWORD_LENGTH, `Hasło musi mieć co najmniej ${MIN_PASSWORD_LENGTH} znaków`)
-			.refine((value) => new TextEncoder().encode(value).length <= MAX_PASSWORD_BYTES, 'Hasło jest za długie'),
-		confirmPassword: z.string(),
+		...confirmedPassword,
 	})
-	.refine((values) => values.password === values.confirmPassword, {
-		message: 'Hasła nie są identyczne',
-		// Attaches the error to the second field, which is the one the user can
-		// fix without retyping both.
-		path: ['confirmPassword'],
-	});
+	.refine(passwordsMatch, passwordMismatch);
 
 export type RegisterValues = z.infer<typeof registerSchema>;
+
+export const forgotPasswordSchema = z.object({ email });
+
+export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
+
+/** What the form binds to. The token rides in a prop, not in a field. */
+export const resetPasswordSchema = z.object(confirmedPassword).refine(passwordsMatch, passwordMismatch);
+
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+
+/** What the route handler parses: the same rules plus the token off the link. */
+export const resetPasswordRequestSchema = z
+	.object({
+		token: z.string().min(1, 'Brak tokenu resetowania hasła'),
+		...confirmedPassword,
+	})
+	.refine(passwordsMatch, passwordMismatch);

@@ -1,12 +1,13 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
 import { signInAction } from '@/app/lib/auth-actions';
 import { signInSchema, type SignInValues } from '@/app/lib/auth.schema';
 
-import { AuthField, AuthFormError, SubmitButton } from './fields';
+import { AuthField, AuthFormError, PasswordField, SubmitButton } from './fields';
 
 /** On success the action redirects and never resolves; only failures return. */
 export function SignInForm({ callbackUrl }: { callbackUrl?: string }) {
@@ -46,14 +47,20 @@ export function SignInForm({ callbackUrl }: { callbackUrl?: string }) {
 				{...register('email')}
 			/>
 
-			<AuthField
+			<PasswordField
 				label='Hasło'
-				type='password'
 				autoComplete='current-password'
 				placeholder='••••••••'
 				error={errors.password?.message}
 				{...register('password')}
 			/>
+
+			<Link
+				href='/forgot-password'
+				className='-mt-1 self-end text-[13px] font-medium text-muted transition-colors hover:text-accent'
+			>
+				Nie pamiętasz hasła?
+			</Link>
 
 			<SubmitButton pending={isSubmitting}>{isSubmitting ? 'Logowanie…' : 'Zaloguj się'}</SubmitButton>
 		</form>
