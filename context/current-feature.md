@@ -1,68 +1,16 @@
-# Current Feature: Honeycomb Backdrop Component
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- One reusable, server-safe component owns the honeycomb pattern — every surface that wants it renders that, and nothing hand-rolls the SVG a second time.
-- `AuthBackdrop` is migrated onto it, so the sign-in / register screens and the new placements cannot drift apart visually.
-- The pattern can be rendered **many times in one document** without an id collision — the current implementation cannot.
-- Animation is opt-in and off by default. Only the auth screens keep the drift; every new placement is static.
-- Three new placements ship: the desktop **sidebar**, the **`/profile` identity card**, and the **dashboard empty state**. Each stays decorative — no text loses contrast, no border or active-nav tint stops reading.
-- The component is easy to inspect and tune: a marker attribute in the DOM, a loud debug mode, and every knob (tile size, tint, opacity, edge fade) a prop rather than a copied class string.
-- No horizontal overflow at any width, `aria-hidden`, `pointer-events-none`, and `prefers-reduced-motion` respected.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-Full spec: `context/features/honeycomb-backdrop-spec.md`.
-
-### Where it goes — audit result
-
-**Ship (3 new placements):**
-
-| Surface | File | Why |
-| --- | --- | --- |
-| Desktop sidebar | `app/components/dashboard/Sidebar.tsx` (`<aside>`) | Tall, always-on, content-free column — 192px of flat `bg-surface` today. User's own suggestion. Watch the active nav item's `bg-accent/5`: the comb must sit under it without muddying it. |
-| Profile identity card | `app/(dashboard)/profile/page.tsx`, the first `<section>` (avatar / name / plan badge) | The page's hero card, mostly empty to the right of the 56px avatar. It is the one card on the page, so repetition is not a risk. User's own suggestion. |
-| Dashboard empty state | `NoApiary` in `app/(dashboard)/dashboard/page.tsx` | A full-height centred void with two lines of text — the single largest blank area in the signed-in app. Every fresh Google sign-in lands here, so it is also a first-impression screen. |
-
-**Already covered, no change:** `/register/check-email`, `/verify-email`, `/forgot-password`, `/reset-password` — all render inside `app/(auth)/layout.tsx`, so they inherit the backdrop for free once it is migrated.
-
-**Rejected, deliberately:**
-
-- **`HiveCard` / `AlertCard`** — up to 8 and 3 instances in one viewport. This is precisely the "too eye-catching" failure mode.
-- **`MobileNav`** — symmetric with the sidebar in principle, but it is a 56px strip already carrying four icon+label pairs. Pattern behind it is noise.
-- **`Topbar` / `TopbarShell`** — sticky, scrolls content underneath it; decoration there competes with whatever is passing beneath.
-- **`/` (`InspectionApp`)** — the inspection form is the densest screen in the app. The natural home is a future marketing landing page, not the form host.
-- **`StepSummary`** — a "moment" screen, but wall-to-wall data cards.
-- **`DeleteAccountDialog`** — a destructive confirmation should not be decorated.
-- **`public/email/comb-backdrop.png`** — the email's flat raster stays as it is. No mail client renders an SVG pattern; the component must not try to serve that case.
-
-### The component
-
-Suggested `app/components/ui/HoneycombBackdrop.tsx` (naming open). Absolutely positioned decorative layer, no children.
-
-Props sketch: `animated` (default `false`), `tone` / `opacity`, `tileSize`, `fade` (edge mask), `className` for positioning, `debug`.
-
-### Constraints and traps
-
-- **The id collision is the reason this is a rewrite, not an extraction.** `AuthBackdrop` renders `<pattern id='auth-comb'>` and its own doc comment says "must be rendered exactly once per document". Three placements plus auth means four. Two ways out: `useId()`, which forces `'use client'` on a purely decorative layer; or a **data-URI SVG `background-image`**, which has no ids at all, tiles via `background-repeat`, sizes via `background-size`, and stays a server component. Prefer the second.
-- **The cost of the data URI: no `currentColor`.** The stroke colour has to be encoded into the URI, so the component takes a colour and builds the string. That is also what makes per-surface tinting a prop instead of a fork.
-- **Keep the drift on `transform`, not `background-position`.** The existing `.comb-drift` keyframes in `app/globals.css` and the `--comb-tile` custom property already guarantee a seamless one-tile loop; reuse them by rendering the layer one tile wider and offset left, exactly as `AuthBackdrop` does today. `background-position` would work but drops off the compositor.
-- **`overflow-hidden` on the parent is load-bearing** wherever the layer is oversized — without it the overhang becomes horizontal page scroll. Auth Phase 3 hit this. If the static variant is not oversized, this only applies to the animated one; either way the parent needs `relative`.
-- **Opacity ceiling.** Auth uses `text-accent/6` over a dark wash where nothing but hero copy sits on it. The sidebar and the profile card carry small 11–13px text and hairline borders; expect to land lower, and verify the `border-border` hairlines and the active nav tint still read.
-- **Restart the dev server if it looks wrong.** This repo has bitten three times on Turbopack staleness — new `@theme` keys, new `'use server'` modules, and edited `globals.css`. If this feature adds a keyframe or a theme key, that is the first thing to check, not the CSS.
-- **Nothing to test with Vitest** unless the URI builder is extracted as a pure function — if it is, it should get a small suite (tile geometry, colour encoding), since URL-encoding a `#` in an SVG fill is a classic silent failure.
-
-### Build notes
-
-- **The old comb was not 6% — it was ~12%.** `AuthBackdrop` stroked at `text-accent/6`, but adjacent hexes share every edge, so each one was painted twice and composited to ~0.116. The mask paints each edge once. Measured in-page on a canvas: old peak pixel `rgb(20,44,29)`, mask at 0.06 `rgb(16,27,20)`, mask at 0.12 `rgb(20,40,27)`. Hence the component default is **0.12**, which is what reproduces the auth screens; the other three placements are tuned relative to that, not to the number in the old source.
-- **`mask-image` beat the spec's `background-image`.** Same "no ids" win, but the tint stays a Tailwind class (`bg-accent`) instead of a hex baked into the URI — so the pattern still follows the design tokens and the `#`-encoding hazard never reaches a colour. The `fade` gradient is a second mask on the wrapper rather than `mask-composite`, whose keywords still differ across engines.
-- **`encodeURIComponent` leaves `(` and `)` alone**, and every cell carries a `translate()`. Safe inside the quoted `url("…")` the component emits, silently broken the moment someone unquotes it — so they are encoded explicitly, with a test pinning it.
-- **`-z-10` + `isolate` on the host, not `relative` on every sibling.** One rule for all four call sites: without `isolate` the negative index escapes and the comb hides behind an ancestor's background; with it, the layer sits above the host's own background and below all its content.
-- **The sidebar fades out at the *top*, not the bottom.** Compared both live: fading the bottom put texture behind the three nav labels and left the empty column bare — backwards. `fade='top'` keeps the nav on clean surface and fills the dead space below it.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -411,3 +359,31 @@ One switch turns the whole verification requirement on or off, so the app can be
 **Guards were mutation-checked**, since passing tests prove nothing on their own: disabling the server-side phrase re-check failed 4 tests, broadening the Premium block to `status === 'active'` failed the seeded-Premium test, and skipping `bcrypt.compare` failed the wrong-current-password test. All three routes restored and confirmed byte-identical by `git diff`.
 
 **Left open:** **No rate limiting on `/api/account/change-password`** — it verifies a current password, so it is a new brute-force surface, joining `/forgot-password` and the two unthrottled re-send actions. **The `Anuluj subskrypcję` path does not exist**, so if a Stripe subscription ever becomes active before Phase 4 ships a cancel flow, that account is blocked from deleting with nothing to click; the block is a no-op today, but the two must land together. **The register route still has no tests**, open since Auth Phase 2 and untouched here. `/analytics` and `/settings` still 404 and keep their `prefetch={false}`. The `Stat` cards, `UsageBar` and `deletionSummary` live in the page file rather than `app/components/profile/` — each is used once. Usage counters are still only ever written by the seed, so the bars show real numbers for the demo account and zeros for everyone else until PDF generation lands. Everything the previous features left open still stands: Vercel needs `RESEND_API_KEY`, `APP_URL` and `EMAIL_VERIFICATION_ENABLED`; Resend cannot mail anyone but the API key owner; `events.linkAccount` is still unexercised against a live Google consent; and `scripts/gen-demo-sql.ts` / `seed-demo.sql` remain gitignored with committed `package.json` siblings.
+
+### Honeycomb Backdrop — completed 2026-08-30
+
+The drifting comb from the auth screens extracted into a reusable layer and applied, static, to three more surfaces. Merged to `main` as `5960d06` (feature commit `71e9ca9`).
+
+**Delivered**
+
+- `app/lib/honeycomb.ts` — tile geometry (`HONEYCOMB_TILE`, `honeycombTileHeight`) and the mask source (`honeycombMaskUri`) as pure functions. `honeycomb.test.ts`, 13 tests. Suite 419 → 432.
+- `app/components/ui/HoneycombBackdrop.tsx` — the layer: `tone`, `opacity`, `tile`, `fade`, `animated`, `debug`, `className`, plus a `data-honeycomb` marker attribute.
+- `AuthBackdrop` rewritten on top of it — 71 lines to 27, visually unchanged.
+- Placements: `Sidebar`'s `<aside>` (tile 44, opacity 0.07, `fade='top'`), the `/profile` identity `<section>` (40 / 0.08 / `left`), and `NoApiary` on `/dashboard` (64 / 0.1 / `center`).
+- `context/features/honeycomb-backdrop-spec.md` — the spec, including the rejected-surface list.
+
+**No migration, no new dependency, no `@theme` key.** The `.comb-drift` keyframes and `--comb-tile` in `globals.css` were reused untouched.
+
+**Decisions worth remembering**
+
+- **The old comb was never 6% — it was ~12%.** `AuthBackdrop` stroked at `text-accent/6`, but adjacent hexes share every edge, so each was painted twice and composited to ~0.116. A mask paints each edge once, so a literal port at 0.06 came out washed out. Measured in-page on a canvas before picking the number: old peak pixel `rgb(20,44,29)`, mask at 0.06 `rgb(16,27,20)`, mask at 0.12 `rgb(20,40,27)`. **The component default is 0.12 and the three placements are tuned relative to that, not to the 0.06 in the old source** — which is exactly the "simplification" a future edit will reach for.
+- **`mask-image`, not the spec's `background-image`.** Both avoid the SVG `<pattern>` id that made the old component single-instance-only, but a mask keeps the tint as a Tailwind class (`bg-accent`) instead of a hex baked into the URI, so the pattern still follows the design tokens. The `fade` gradient is a second mask on the wrapper element rather than `mask-composite`, whose keywords still differ across engines.
+- **`encodeURIComponent` does not escape `(` or `)`**, and every cell carries a `translate()`. Safe inside the quoted `url("…")` the component emits, silently broken the moment someone unquotes it — so they are encoded explicitly, with a test pinning it. The `#` hazard the spec predicted never arose, because no colour reaches the URI at all.
+- **`-z-10` on the layer plus `isolate` on the host, rather than `relative` on every sibling.** One rule for all four call sites. Without `isolate` the negative index escapes the host and the comb hides behind an ancestor's background; with it, the layer paints above the host's own background and below all of its content. `overflow-hidden` stays mandatory — the animated layer is a tile wider than its host.
+- **The sidebar fades out at the *top*.** Both directions were compared live: `fade='bottom'` put texture behind the three nav labels and left the empty column bare, which is backwards. `fade='top'` keeps the nav on clean surface and fills only the dead space below it.
+- **Rejected placements are written down in the spec, with reasons** — hive and alert cards (8 and 3 per viewport), `MobileNav`, `Topbar`, the inspection form, `StepSummary`, `DeleteAccountDialog`, and the email PNG. The tempting future addition is the hive cards, which is the exact "too eye-catching" failure the brief ruled out.
+- **The component is imported into `Sidebar`, a `'use client'` file**, so it ships in that bundle. It holds no hooks or server-only imports, so it works in both worlds untouched.
+
+**Verified** on a production build at 320 / 390 / 768 / 1440, against the Neon **development** branch. Auth: the drift measured seamless (`translateX(59.995px)` at 11999ms, `0` at 12000ms — matching Auth Phase 3's original measurement), the layer 780px wide inside a 720px half, `prefers-reduced-motion: reduce` still resolving to `animation: none`. Signed in: two backdrops coexisting on `/dashboard` with **zero SVG ids in the document** and no duplicate-id or console warnings, `document.scrollWidth === innerWidth` and no element past the viewport at any of the four widths, the active nav item's `border-l-accent` and `bg-accent/5` still reading over the comb, every card hairline intact. Checked with the seeded demo account and a throwaway no-apiary account for the empty state, deleted afterwards. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (432 tests) and `next build` all green.
+
+**Left open:** **`fade` has no two-ended variant**, so a surface wanting the pattern clear at both the top and the bottom cannot express it — the sidebar wanted this and settled for `top`. **No responsive control:** `opacity` and `tile` are single values, so the profile card carries the same 0.08 at 390px, where the card is full of text, as at 1440px where it is mostly empty; `className` can carry a responsive `opacity-*` utility if that ever matters. The `debug` prop was written but never exercised in the browser. **Running a production build on a non-3000 port needs `AUTH_TRUST_HOST=true`** or the credentials callback 500s with `UntrustedHost` — pre-existing, unrelated to this feature, but it costs a confused minute every time. Everything the previous features left open still stands: no rate limiting on `/forgot-password`, the two re-send actions or `/api/account/change-password`; the register route still has no tests; Vercel still needs `RESEND_API_KEY`, `APP_URL` and `EMAIL_VERIFICATION_ENABLED`; Resend still cannot mail anyone but the API key owner; `/analytics` and `/settings` still 404; and `events.linkAccount` is still unexercised against a live Google consent.
