@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+	changePasswordSchema,
+	deleteAccountSchema,
 	forgotPasswordSchema,
 	MIN_PASSWORD_LENGTH,
 	PASSWORD_REQUIREMENTS,
@@ -286,5 +288,71 @@ describe('resetPasswordRequestSchema', () => {
 		const result = resetPasswordRequestSchema.safeParse({ ...VALID, confirmPassword: 'InneHaslo9Tutaj' });
 
 		expect(messageFor(result, 'confirmPassword')).toBe('Hasła nie są identyczne');
+	});
+});
+
+describe('changePasswordSchema', () => {
+	const VALID = { currentPassword: 'StareHaslo9Tutaj', password: STRONG, confirmPassword: STRONG };
+
+	it('accepts a current password plus a matching strong new pair', () => {
+		expect(changePasswordSchema.safeParse(VALID).success).toBe(true);
+	});
+
+	it('requires the current password', () => {
+		expect(messageFor(changePasswordSchema.safeParse({ ...VALID, currentPassword: '' }), 'currentPassword')).toBe(
+			'Podaj aktualne hasło',
+		);
+	});
+
+	/**
+	 * Presence only, exactly like `signInSchema`: whatever is already stored has
+	 * to be typeable, including a password that predates the current rules.
+	 */
+	it('does not apply the strength rules to the current password', () => {
+		expect(changePasswordSchema.safeParse({ ...VALID, currentPassword: 'x' }).success).toBe(true);
+	});
+
+	it('applies the strength rules to the new password', () => {
+		for (const requirement of PASSWORD_REQUIREMENTS) {
+			expect(requirement.test('krotkie')).toBe(false);
+		}
+
+		expect(changePasswordSchema.safeParse({ ...VALID, password: 'krotkie', confirmPassword: 'krotkie' }).success).toBe(
+			false,
+		);
+	});
+
+	it('rejects a mismatched confirmation on the second field', () => {
+		const result = changePasswordSchema.safeParse({ ...VALID, confirmPassword: 'InneHaslo9Tutaj' });
+
+		expect(messageFor(result, 'confirmPassword')).toBe('Hasła nie są identyczne');
+	});
+
+	// Not a strength rule — a "change" that changes nothing is a no-op the user
+	// would otherwise be told succeeded.
+	it('rejects a new password identical to the current one', () => {
+		const result = changePasswordSchema.safeParse({
+			currentPassword: STRONG,
+			password: STRONG,
+			confirmPassword: STRONG,
+		});
+
+		expect(messageFor(result, 'password')).toBe('Nowe hasło musi różnić się od aktualnego');
+	});
+});
+
+describe('deleteAccountSchema', () => {
+	it('accepts any non-empty confirmation', () => {
+		expect(deleteAccountSchema.safeParse({ confirmation: 'DeleteMyAccount' }).success).toBe(true);
+		// Whether it *matches* is `isDeleteConfirmed`'s job, so the schema passes
+		// a wrong phrase through to that check rather than duplicating the literal.
+		expect(deleteAccountSchema.safeParse({ confirmation: 'cokolwiek' }).success).toBe(true);
+	});
+
+	it('rejects an empty or missing confirmation', () => {
+		expect(messageFor(deleteAccountSchema.safeParse({ confirmation: '' }), 'confirmation')).toBe(
+			'Wpisz frazę potwierdzającą',
+		);
+		expect(deleteAccountSchema.safeParse({}).success).toBe(false);
 	});
 });

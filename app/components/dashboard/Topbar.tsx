@@ -16,50 +16,40 @@ const BUTTON_PRIMARY = 'border-transparent bg-accent font-semibold text-backgrou
 
 const ICON = 'h-4 w-4 shrink-0 fill-none stroke-current stroke-2 [stroke-linecap:round] lg:h-3.25 lg:w-3.25';
 
-interface TopbarProps {
-	apiaryName: string;
-	location: string;
+interface TopbarShellProps {
+	title: string;
+	/** Rendered after a separator, and only from `sm` up. Empty means neither. */
+	subtitle?: string;
+	actions?: React.ReactNode;
 }
 
 /**
- * Sticky against the scroll container in `(dashboard)/layout.tsx` — the `<main>`
- * element, not the viewport — which is why it needs an explicit surface
- * background rather than inheriting the page's.
+ * The bar every page in the `(dashboard)` group wears: sticky against the
+ * scroll container in `(dashboard)/layout.tsx` — the `<main>` element, not the
+ * viewport — which is why it needs an explicit surface background rather than
+ * inheriting the page's.
  *
- * Async because below `lg` it carries the account menu. Reads the session
- * itself rather than taking a prop — a JWT cookie decode, not a query.
+ * Async because below `lg` it carries the account menu, which is the whole
+ * reason this is shared rather than duplicated: a page that rolls its own
+ * header silently loses sign-out on mobile, where the sidebar footer does not
+ * exist. It reads the session itself rather than taking a prop — a JWT cookie
+ * decode, not a query.
  */
-export async function Topbar({ apiaryName, location }: TopbarProps) {
+export async function TopbarShell({ title, subtitle = '', actions }: TopbarShellProps) {
 	const session = await auth();
 
 	return (
 		<header className='sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-b-border bg-surface px-4 py-2 lg:px-6 lg:py-3'>
 			{/* min-w-0 lets the name truncate instead of shoving the buttons off-screen. */}
 			<div className='flex min-w-0 items-center gap-2'>
-				<span className='truncate text-[14px] font-medium text-foreground lg:text-[13px]'>{apiaryName}</span>
-				{/* The separator belongs to the location, not to the bar — an apiary with
+				<span className='truncate text-[14px] font-medium text-foreground lg:text-[13px]'>{title}</span>
+				{/* The separator belongs to the subtitle, not to the bar — an apiary with
 				    no location set would otherwise render a dangling "·". */}
-				{location && <span className='hidden shrink-0 text-[12px] text-muted sm:inline'>· {location}</span>}
+				{subtitle && <span className='hidden shrink-0 text-[12px] text-muted sm:inline'>· {subtitle}</span>}
 			</div>
 
 			<div className='flex shrink-0 items-center gap-2'>
-				{/* Drops to an icon-only square on phones — "Dodaj ul" is the rarer action
-				    and the label is what a narrow bar can least afford. */}
-				<button
-					type='button'
-					aria-label='Dodaj ul'
-					className={`${BUTTON_SECONDARY} ${BUTTON_BASE} min-w-11 lg:min-w-0`}
-				>
-					<PlusIcon className={ICON} />
-					<span className='hidden lg:inline'>Dodaj ul</span>
-				</button>
-				<button
-					type='button'
-					className={`${BUTTON_PRIMARY} ${BUTTON_BASE} px-3`}
-				>
-					<PlusIcon className={ICON} />
-					Nowy przegląd
-				</button>
+				{actions}
 
 				{/* Phones only — from `lg` up this menu lives in the sidebar footer. */}
 				{session?.user && (
@@ -73,5 +63,41 @@ export async function Topbar({ apiaryName, location }: TopbarProps) {
 				)}
 			</div>
 		</header>
+	);
+}
+
+interface TopbarProps {
+	apiaryName: string;
+	location: string;
+}
+
+/** The apiary bar: the shell above plus the two hive actions. */
+export function Topbar({ apiaryName, location }: TopbarProps) {
+	return (
+		<TopbarShell
+			title={apiaryName}
+			subtitle={location}
+			actions={
+				<>
+					{/* Drops to an icon-only square on phones — "Dodaj ul" is the rarer action
+					    and the label is what a narrow bar can least afford. */}
+					<button
+						type='button'
+						aria-label='Dodaj ul'
+						className={`${BUTTON_SECONDARY} ${BUTTON_BASE} min-w-11 lg:min-w-0`}
+					>
+						<PlusIcon className={ICON} />
+						<span className='hidden lg:inline'>Dodaj ul</span>
+					</button>
+					<button
+						type='button'
+						className={`${BUTTON_PRIMARY} ${BUTTON_BASE} px-3`}
+					>
+						<PlusIcon className={ICON} />
+						Nowy przegląd
+					</button>
+				</>
+			}
+		/>
 	);
 }
