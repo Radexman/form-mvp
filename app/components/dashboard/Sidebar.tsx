@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { HoneycombBackdrop } from '@/app/components/ui/HoneycombBackdrop';
+
 import { HexIcon } from './icons';
 import { isNavItemActive, NAV_ITEMS } from './nav';
 import { UserMenu } from './UserMenu';
@@ -38,7 +40,15 @@ export function Sidebar({ userName, userShortName, userImage, isPremium }: Sideb
 	const pathname = usePathname();
 
 	return (
-		<aside className='hidden w-48 shrink-0 flex-col border-r border-r-border bg-surface lg:flex'>
+		<aside className='relative isolate hidden w-48 shrink-0 flex-col overflow-hidden border-r border-r-border bg-surface lg:flex'>
+			{/* Fades out at the top so the nav labels sit on clean surface; the
+			    texture only fills the dead space below them. */}
+			<HoneycombBackdrop
+				tile={44}
+				opacity={0.07}
+				fade='top'
+			/>
+
 			<div className='flex items-center gap-2.25 border-b border-b-border px-4 pt-4.5 pb-4'>
 				<span className='flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md bg-accent'>
 					<HexIcon className='h-3.5 w-3.5 fill-none stroke-background stroke-[2.5] [stroke-linejoin:round]' />

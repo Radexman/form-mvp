@@ -1,16 +1,68 @@
-# Current Feature
+# Current Feature: Honeycomb Backdrop Component
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- One reusable, server-safe component owns the honeycomb pattern — every surface that wants it renders that, and nothing hand-rolls the SVG a second time.
+- `AuthBackdrop` is migrated onto it, so the sign-in / register screens and the new placements cannot drift apart visually.
+- The pattern can be rendered **many times in one document** without an id collision — the current implementation cannot.
+- Animation is opt-in and off by default. Only the auth screens keep the drift; every new placement is static.
+- Three new placements ship: the desktop **sidebar**, the **`/profile` identity card**, and the **dashboard empty state**. Each stays decorative — no text loses contrast, no border or active-nav tint stops reading.
+- The component is easy to inspect and tune: a marker attribute in the DOM, a loud debug mode, and every knob (tile size, tint, opacity, edge fade) a prop rather than a copied class string.
+- No horizontal overflow at any width, `aria-hidden`, `pointer-events-none`, and `prefers-reduced-motion` respected.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+Full spec: `context/features/honeycomb-backdrop-spec.md`.
+
+### Where it goes — audit result
+
+**Ship (3 new placements):**
+
+| Surface | File | Why |
+| --- | --- | --- |
+| Desktop sidebar | `app/components/dashboard/Sidebar.tsx` (`<aside>`) | Tall, always-on, content-free column — 192px of flat `bg-surface` today. User's own suggestion. Watch the active nav item's `bg-accent/5`: the comb must sit under it without muddying it. |
+| Profile identity card | `app/(dashboard)/profile/page.tsx`, the first `<section>` (avatar / name / plan badge) | The page's hero card, mostly empty to the right of the 56px avatar. It is the one card on the page, so repetition is not a risk. User's own suggestion. |
+| Dashboard empty state | `NoApiary` in `app/(dashboard)/dashboard/page.tsx` | A full-height centred void with two lines of text — the single largest blank area in the signed-in app. Every fresh Google sign-in lands here, so it is also a first-impression screen. |
+
+**Already covered, no change:** `/register/check-email`, `/verify-email`, `/forgot-password`, `/reset-password` — all render inside `app/(auth)/layout.tsx`, so they inherit the backdrop for free once it is migrated.
+
+**Rejected, deliberately:**
+
+- **`HiveCard` / `AlertCard`** — up to 8 and 3 instances in one viewport. This is precisely the "too eye-catching" failure mode.
+- **`MobileNav`** — symmetric with the sidebar in principle, but it is a 56px strip already carrying four icon+label pairs. Pattern behind it is noise.
+- **`Topbar` / `TopbarShell`** — sticky, scrolls content underneath it; decoration there competes with whatever is passing beneath.
+- **`/` (`InspectionApp`)** — the inspection form is the densest screen in the app. The natural home is a future marketing landing page, not the form host.
+- **`StepSummary`** — a "moment" screen, but wall-to-wall data cards.
+- **`DeleteAccountDialog`** — a destructive confirmation should not be decorated.
+- **`public/email/comb-backdrop.png`** — the email's flat raster stays as it is. No mail client renders an SVG pattern; the component must not try to serve that case.
+
+### The component
+
+Suggested `app/components/ui/HoneycombBackdrop.tsx` (naming open). Absolutely positioned decorative layer, no children.
+
+Props sketch: `animated` (default `false`), `tone` / `opacity`, `tileSize`, `fade` (edge mask), `className` for positioning, `debug`.
+
+### Constraints and traps
+
+- **The id collision is the reason this is a rewrite, not an extraction.** `AuthBackdrop` renders `<pattern id='auth-comb'>` and its own doc comment says "must be rendered exactly once per document". Three placements plus auth means four. Two ways out: `useId()`, which forces `'use client'` on a purely decorative layer; or a **data-URI SVG `background-image`**, which has no ids at all, tiles via `background-repeat`, sizes via `background-size`, and stays a server component. Prefer the second.
+- **The cost of the data URI: no `currentColor`.** The stroke colour has to be encoded into the URI, so the component takes a colour and builds the string. That is also what makes per-surface tinting a prop instead of a fork.
+- **Keep the drift on `transform`, not `background-position`.** The existing `.comb-drift` keyframes in `app/globals.css` and the `--comb-tile` custom property already guarantee a seamless one-tile loop; reuse them by rendering the layer one tile wider and offset left, exactly as `AuthBackdrop` does today. `background-position` would work but drops off the compositor.
+- **`overflow-hidden` on the parent is load-bearing** wherever the layer is oversized — without it the overhang becomes horizontal page scroll. Auth Phase 3 hit this. If the static variant is not oversized, this only applies to the animated one; either way the parent needs `relative`.
+- **Opacity ceiling.** Auth uses `text-accent/6` over a dark wash where nothing but hero copy sits on it. The sidebar and the profile card carry small 11–13px text and hairline borders; expect to land lower, and verify the `border-border` hairlines and the active nav tint still read.
+- **Restart the dev server if it looks wrong.** This repo has bitten three times on Turbopack staleness — new `@theme` keys, new `'use server'` modules, and edited `globals.css`. If this feature adds a keyframe or a theme key, that is the first thing to check, not the CSS.
+- **Nothing to test with Vitest** unless the URI builder is extracted as a pure function — if it is, it should get a small suite (tile geometry, colour encoding), since URL-encoding a `#` in an SVG fill is a classic silent failure.
+
+### Build notes
+
+- **The old comb was not 6% — it was ~12%.** `AuthBackdrop` stroked at `text-accent/6`, but adjacent hexes share every edge, so each one was painted twice and composited to ~0.116. The mask paints each edge once. Measured in-page on a canvas: old peak pixel `rgb(20,44,29)`, mask at 0.06 `rgb(16,27,20)`, mask at 0.12 `rgb(20,40,27)`. Hence the component default is **0.12**, which is what reproduces the auth screens; the other three placements are tuned relative to that, not to the number in the old source.
+- **`mask-image` beat the spec's `background-image`.** Same "no ids" win, but the tint stays a Tailwind class (`bg-accent`) instead of a hex baked into the URI — so the pattern still follows the design tokens and the `#`-encoding hazard never reaches a colour. The `fade` gradient is a second mask on the wrapper rather than `mask-composite`, whose keywords still differ across engines.
+- **`encodeURIComponent` leaves `(` and `)` alone**, and every cell carries a `translate()`. Safe inside the quoted `url("…")` the component emits, silently broken the moment someone unquotes it — so they are encoded explicitly, with a test pinning it.
+- **`-z-10` + `isolate` on the host, not `relative` on every sibling.** One rule for all four call sites: without `isolate` the negative index escapes and the comb hides behind an ancestor's background; with it, the layer sits above the host's own background and below all its content.
+- **The sidebar fades out at the *top*, not the bottom.** Compared both live: fading the bottom put texture behind the three nav labels and left the empty column bare — backwards. `fade='top'` keeps the nav on clean surface and fills the dead space below it.
 
 ## History
 
