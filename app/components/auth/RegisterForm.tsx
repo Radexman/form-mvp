@@ -4,9 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 
-import { registerSchema, type RegisterValues } from '@/app/lib/auth.schema';
+import { MIN_PASSWORD_LENGTH, registerSchema, type RegisterValues } from '@/app/lib/auth.schema';
 
-import { AuthField, AuthFormError, SubmitButton } from './fields';
+import { AuthField, AuthFormError, PasswordField, SubmitButton } from './fields';
 
 interface RegisterErrorBody {
 	error?: string;
@@ -112,18 +112,17 @@ export function RegisterForm() {
 				{...register('email')}
 			/>
 
-			<AuthField
+			<PasswordField
 				label='Hasło'
-				type='password'
 				autoComplete='new-password'
-				placeholder='Co najmniej 8 znaków'
+				placeholder={`Co najmniej ${MIN_PASSWORD_LENGTH} znaków`}
 				error={errors.password?.message}
+				showRequirements
 				{...register('password')}
 			/>
 
-			<AuthField
+			<PasswordField
 				label='Powtórz hasło'
-				type='password'
 				autoComplete='new-password'
 				placeholder='••••••••'
 				error={errors.confirmPassword?.message}

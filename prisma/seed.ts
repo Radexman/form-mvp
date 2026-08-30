@@ -8,9 +8,12 @@ import { HiveType, PlanTier, PrismaClient } from '../generated/prisma/client';
 // directly does not — load the same files prisma.config.ts does.
 config({ path: ['.env.local', '.env'], quiet: true });
 
-const DEMO_EMAIL = 'demo@getapiary.app';
+const DEMO_EMAIL = 'demo@hivewise.app';
 const DEMO_NAME = 'Jan Pszczelarz';
-const DEMO_PASSWORD = 'demo1234';
+// Must satisfy `registerSchema` in app/lib/auth.schema.ts — the demo account
+// is the one people try to change the password on, and a seeded password the
+// app would refuse to set is a trap.
+const DEMO_PASSWORD = 'Demo2026Miodowy';
 const SALT_ROUNDS = 10;
 
 const APIARY_NAME = 'Pasieka Turawa';

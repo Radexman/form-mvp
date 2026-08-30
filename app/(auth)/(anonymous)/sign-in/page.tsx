@@ -17,15 +17,20 @@ const NOTICES = {
 	// Where the register form lands when email verification is switched off, so
 	// there is no `/register/check-email` step between account and sign-in.
 	registered: { tone: 'ok', text: 'Konto zostało utworzone. Możesz się teraz zalogować.' },
+	reset: { tone: 'ok', text: 'Hasło zostało zmienione. Zaloguj się nowym hasłem.' },
 } as const;
 
-function pageNotice(verified?: string, error?: string, registered?: string) {
+function pageNotice(verified?: string, error?: string, registered?: string, reset?: string) {
 	if (verified === 'true' || verified === 'already') {
 		return NOTICES[verified];
 	}
 
 	if (error === 'invalid_token') {
 		return NOTICES.invalid_token;
+	}
+
+	if (reset === '1') {
+		return NOTICES.reset;
 	}
 
 	return registered === '1' ? NOTICES.registered : undefined;
@@ -35,10 +40,16 @@ function pageNotice(verified?: string, error?: string, registered?: string) {
 export default async function SignInPage({
 	searchParams,
 }: {
-	searchParams: Promise<{ callbackUrl?: string; verified?: string; error?: string; registered?: string }>;
+	searchParams: Promise<{
+		callbackUrl?: string;
+		verified?: string;
+		error?: string;
+		registered?: string;
+		reset?: string;
+	}>;
 }) {
-	const { callbackUrl, verified, error, registered } = await searchParams;
-	const notice = pageNotice(verified, error, registered);
+	const { callbackUrl, verified, error, registered, reset } = await searchParams;
+	const notice = pageNotice(verified, error, registered, reset);
 
 	return (
 		<>

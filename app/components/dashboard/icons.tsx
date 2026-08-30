@@ -147,3 +147,39 @@ export function MailIcon({ className }: { className?: string }) {
 		</svg>
 	);
 }
+
+export function EyeIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox='0 0 24 24'
+			aria-hidden='true'
+			className={className}
+		>
+			<path d='M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z' />
+			<circle
+				cx='12'
+				cy='12'
+				r='3'
+			/>
+		</svg>
+	);
+}
+
+export function EyeOffIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox='0 0 24 24'
+			aria-hidden='true'
+			className={className}
+		>
+			<path d='M10.6 6.2A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.4 4.2M6.5 7.4A17.4 17.4 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.1-.9' />
+			<path d='M9.9 9.9a3 3 0 0 0 4.2 4.2' />
+			<line
+				x1='3'
+				y1='3'
+				x2='21'
+				y2='21'
+			/>
+		</svg>
+	);
+}
