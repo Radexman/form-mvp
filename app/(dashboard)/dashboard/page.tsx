@@ -18,6 +18,7 @@ import {
 import { AlertCard, type AlertCardProps } from '../../components/dashboard/AlertCard';
 import { HiveCard, type HiveCardProps } from '../../components/dashboard/HiveCard';
 import { Topbar } from '../../components/dashboard/Topbar';
+import { HoneycombBackdrop } from '../../components/ui/HoneycombBackdrop';
 
 const SECTION_LABEL = 'mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-muted uppercase lg:text-[10px]';
 
@@ -179,7 +180,13 @@ function NoApiary({ firstName }: { firstName: string }) {
 				location=''
 			/>
 
-			<div className='flex flex-1 items-center justify-center p-6'>
+			<div className='relative isolate flex flex-1 items-center justify-center overflow-hidden p-6'>
+				<HoneycombBackdrop
+					tile={64}
+					opacity={0.1}
+					fade='center'
+				/>
+
 				<div className='max-w-sm text-center'>
 					<h1 className='mb-2 text-[22px] font-semibold tracking-[-0.02em] text-foreground lg:text-[20px]'>
 						Witaj, {firstName}

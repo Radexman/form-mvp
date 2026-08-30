@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
 import { Avatar } from '@/app/components/ui/Avatar';
+import { HoneycombBackdrop } from '@/app/components/ui/HoneycombBackdrop';
 import { ChangePasswordForm } from '@/app/components/profile/ChangePasswordForm';
 import { DeleteAccountDialog } from '@/app/components/profile/DeleteAccountDialog';
 import { formatHiveCount } from '@/app/lib/dashboard';
@@ -95,7 +96,13 @@ export default async function ProfilePage() {
 				{/* Capped and centred: these are single-column settings sections, and a
 				    1440px-wide password field is a worse target, not a better one. */}
 				<div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
-					<section className={`${CARD} flex items-center gap-4`}>
+					<section className={`${CARD} relative isolate flex items-center gap-4 overflow-hidden`}>
+						<HoneycombBackdrop
+							tile={40}
+							opacity={0.08}
+							fade='left'
+						/>
+
 						<Avatar
 							image={user.image}
 							name={user.name}
