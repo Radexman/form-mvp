@@ -1,67 +1,16 @@
-# Current Feature: Forgot Password
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- **`/forgot-password`** (in the `(auth)/(anonymous)` group) — one email field. Always answers with the same confirmation, whether or not the address exists.
-- **`/reset-password?token=…`** — new password + confirm, validated against the same rules `registerSchema` enforces. Invalid, expired, consumed or missing token renders a dead-end state with a link back to `/forgot-password`, not a form.
-- **Reset tokens live in the existing `VerificationToken` table** (`identifier` / `token` / `expires`), not in new `User` columns — so no migration, and a user can hold a reset token and an email-verification token at once.
-- **Request step** — mint a token, store it, mail the link. Same write-then-send order as `issueVerificationEmail`.
-- **Consume step** — verify the token, `bcrypt.hash` the new password at cost 10, write `passwordHash`, **delete the token row**, redirect to `/sign-in` with a success notice.
-- **Reset-password email** — a second template beside `verificationEmailHtml`, same tables/inline-styles/PNG-backdrop construction and the same `{ data, error }` handling.
-- **"Nie pamiętasz hasła?"** link on `/sign-in`, and a new entry in that page's `NOTICES` map for the post-reset banner.
-- **Schemas in `app/lib/auth.schema.ts`** — `forgotPasswordSchema` (the shared `email` pipe) and `resetPasswordSchema` reusing the existing password rules and the confirm-password refinement.
-- **Tests** for the token helpers and the schemas. Suite is at 288.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-### The model is empty, and that is the point
-
-`VerificationToken` is declared in `prisma/schema.prisma` and its table was created by `20260828141044_init`, but **no app code has ever read or written it** — the email-verification feature stored its token in `User.verificationToken` / `verificationTokenExpiresAt` instead. This feature is its first consumer. **No migration is needed**, and by the same token nothing about the existing verification flow may be moved into it as a drive-by.
-
-It is Auth.js's table, though: `@auth/prisma-adapter` writes `identifier` = the user's email for email-link (magic link) sign-in. That provider is not configured, so the table is free today — but a bare email as `identifier` would collide the day it is. **Namespace the identifier** (`password-reset:<email>`, or the user id under a prefix) so the two kinds can never be confused, and always filter on that prefix when reading.
-
-### Where this must differ from email verification
-
-- **Single use — delete the row on consumption.** The verification token deliberately *stays* on the row, because `emailVerified` is what makes it inert and a double click is the ordinary case. A reset token has no equivalent natural inertness: leaving it live would let anyone who later reads the link (mail archive, forwarded thread, browser history) set the password again. Delete it in the same transaction as the password write.
-- **Short TTL.** `VERIFICATION_TOKEN_TTL_MS` is 24h; a reset link should be ~1h. Do not reuse the constant.
-- **Mint fresh, and drop any previous reset token for that identifier first.** Two live links is one more than intended.
-
-### Decisions to make deliberately, not by accident
-
-- **OAuth-only accounts (`passwordHash: null`).** Phase 2 refused to let `/api/auth/register` set a password on an existing Google row, because that hands the account to anyone who knows the address. Reset is different — it proves control of the mailbox — but it is still a policy choice, so make it explicitly and record it either way.
-- **Does a successful reset stamp `emailVerified`?** Clicking the link proves the same thing the verification link proves. If it does not, someone can reset their password and still land on `/verify-email`.
-- **Sessions are JWTs and cannot be revoked.** A reset does not sign out an attacker who already holds a valid cookie. Note the limitation; do not build session invalidation for it here.
-- **Account enumeration.** `/forgot-password` must answer identically for known and unknown addresses — the opposite of the register route's deliberate 409. Watch the timing too: hashing and mailing only in the found branch is itself a signal, though this is the same gap already accepted in `resendVerificationForEmailAction`.
-
-### What to reuse verbatim
-
-- `app/lib/resend.ts` → `getResend()`, lazy. Resend's SDK **resolves `{ data, error }`, it does not reject** — a bare `await` reports success for a refused message.
-- `resolveAppUrl()` from `verification-token.ts` for the link base, and `randomBytes(32).toString('hex')` for the token.
-- `send-verification-email.ts` for the email's shape: tables, fully inlined CSS, `bgcolor` beside `background-image` (images are blocked by default), the `color-scheme` metas, and `public/email/comb-backdrop.png`.
-- `app/components/auth/fields.tsx` for the form vocabulary, `RegisterForm.tsx` for the submit/error pattern.
-- `SignInForm`'s handling of Zod `z.flattenError` field-keyed messages. Polish copy throughout.
-
-### Environment and delivery reality
-
-`FROM` is a hardcoded `onboarding@resend.dev`, Resend's sandbox sender: **it only delivers to the API key owner and rejects plus-aliases.** So a send failure must not lose the token — store first, and let the user retry. Vercel still lacks `RESEND_API_KEY` and `APP_URL`; without `APP_URL` the link points at `localhost:3000`.
-
-`EMAIL_VERIFICATION_ENABLED` should **not** gate this flow — password reset is not email verification, and gating it would leave accounts with no recovery path whenever the flag is off. Decide it once and say so in the code.
-
-### Traps this repo has already paid for
-
-- **Restart `next dev` after adding a new `'use server'` module** or a new `@theme` key — both go unregistered in a running server and fail in ways that look like broken code. Turbopack has also served stale `globals.css`.
-- **Never run two `next dev` processes** — they share `.next` and corrupt each other.
-- **The dev server logs server-action arguments in plaintext**, so a password submitted through an action shows up in the terminal. `FormData` avoids it.
-- Any page whose only env- or token-dependent branch short-circuits before touching `auth()` or `searchParams` will **prerender**; `/reset-password` reads `searchParams`, so it is dynamic, but check the build output (`ƒ` vs `○`) rather than assuming.
-- Paths in specs are often `src/`-prefixed; **this repo has no `src/`**.
-
-### Still open from earlier phases, and relevant here
-
-**No rate limiting anywhere** — `/forgot-password` is the classic mail-spam vector and joins two unthrottled re-send actions. **No tests for `auth.schema.ts` or the register route**, open since Phase 2; this feature touches that file, so it is the natural moment to close the gap.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -332,3 +281,44 @@ One switch turns the whole verification requirement on or off, so the app can be
 **Verified** against the Neon **development** branch, flipping the flag between two production servers on port 3101. Flag off: register → 201 `verificationRequired: false`, row stamped with no token, `/dashboard` 200, `/verify-email` → `/dashboard`, `/register/check-email` → `/sign-in`, `?registered=1` banner rendering and no banner without params. Flag on: register → 201 `verificationRequired: true` with a token and 24h expiry, `emailVerified: null`, `/dashboard` → `/verify-email`, that page rendering the right address, `/register/check-email` 200. Across the flip: an account created while off reached `/dashboard` with the flag on; a token minted while on returned `verified=true`, then `verified=already`, then `error=invalid_token` for a bad token, after it was switched off. Three test accounts created and deleted. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (288 tests) and `next build` all green.
 
 **Left open:** **Vercel needs `EMAIL_VERIFICATION_ENABLED`** — set it `false` (or leave it unset) until a domain is verified at resend.com/domains, since `FROM` in `send-verification-email.ts` is still `onboarding@resend.dev` and turning it on now would strand every new signup. Turning it on later is: verify the domain, change that constant (a code change, not an env var), set the variable, redeploy — Vercel bakes env vars into a deployment, so the value alone does nothing. **The re-send guards were verified by reading, not by request** — invoking a server action needs a page that renders its button, and with the flag off both such pages redirect. Everything the previous feature left open still stands: no rate limiting on either re-send action, no tests for `auth.schema.ts` or the register route (open since Phase 2), `events.linkAccount` still unexercised against a live Google consent, `/profile` still missing, and the prod demo password still `demo1234`.
+
+### Forgot Password — completed 2026-08-30
+
+`/forgot-password` and `/reset-password`, backed by the previously unused Auth.js `VerificationToken` table. Merged to `main` as `39ee04d` (feature commit `bfe3185`).
+
+**Delivered**
+
+- `app/lib/email/password-reset-token.ts` — generation, 1h expiry, the `password-reset:` identifier namespace and its reader, `buildPasswordResetUrl`. 21 tests.
+- `app/lib/email/send-password-reset-email.ts` and `issue-password-reset.ts` — the write-then-send step, mirroring `issueVerificationEmail`.
+- `app/api/auth/forgot-password/route.ts` and `app/api/auth/reset-password/route.ts`.
+- `app/(auth)/(anonymous)/forgot-password/page.tsx` + `ForgotPasswordForm`; `app/(auth)/reset-password/page.tsx` + `ResetPasswordForm`.
+- `app/lib/auth.schema.ts` — `forgotPasswordSchema`, `resetPasswordSchema`, `resetPasswordRequestSchema`, and a strengthened `newPassword`. `auth.schema.test.ts`, 43 tests — the gap open since Auth Phase 2.
+- `PasswordField` in `fields.tsx` with a reveal toggle and a requirements checklist; `EyeIcon` / `EyeOffIcon`. Used on sign-in, register and both reset fields.
+- `/sign-in` — the "Nie pamiętasz hasła?" link and the `reset=1` notice.
+- `prisma/seed.ts` and `scripts/seed-demo.ts` — demo account moved to `demo@hivewise.app` / `Demo2026Miodowy`; `scripts/purge-users.ts` `KEEP_EMAILS` emptied. Suite 288 → 353.
+
+**No migration.** The `VerificationToken` table has existed since `20260828141044_init` and had never been read or written — this feature is its first consumer, exactly as the load notes predicted.
+
+**Decisions worth remembering**
+
+- **The identifier is namespaced `password-reset:<email>`, and the prefix is checked on every read.** `@auth/prisma-adapter` writes a bare email as `identifier` for magic-link sign-in; that provider is not configured, but the prefix means enabling it later cannot make an adapter token spendable as a password reset. Verified live by planting a bare-identifier row: both the API and the page rejected it, **and left it in place** — a token belonging to another flow must not be destroyed by a failed reset attempt.
+- **Reset tokens behave the opposite way to verification tokens, deliberately.** 1h rather than 24h, and deleted on consumption rather than left inert by `emailVerified`. A reset token has no natural inertness: leaving it live would let anyone who later reads the link (mail archive, forwarded thread, browser history) set the password again. Deletion is scoped to the identifier, so any other outstanding link for that address dies with it, and a fresh request drops the previous token first.
+- **`deleteMany`, not `delete`, when consuming.** A double submit would make the second call throw `P2025` on a row the first already removed.
+- **A reset may set a password on an OAuth-only account.** Registration refuses this because an unauthenticated request proves nothing; a reset link proves control of the mailbox, which is the same thing Google verified. Refusing would strand those users behind a generic message that cannot explain itself.
+- **A successful reset stamps `emailVerified` when it is null.** Same proof, and without it a user could reset their password and still be parked on `/verify-email`.
+- **`/forgot-password` answers `200 {ok:true}` for every address that parses** — known, unknown, OAuth-only and unverified alike. The opposite of the register route's 409, which has an excuse this endpoint does not. A send failure is swallowed and logged rather than returned, because a 500 would say "this address exists and our mailer is down".
+- **`/reset-password` sits outside the `(anonymous)` group.** That layout redirects anyone with a live session, which would swallow the link for a user still signed in elsewhere and burn a token they cannot spend. `/forgot-password` stays inside it.
+- **Both endpoints are route handlers, not server actions.** Beyond the status codes the forms branch on, Next traces server-action arguments in the dev console — a password submitted through an action is printed in plaintext, the bug `signInAction` still has.
+- **`EMAIL_VERIFICATION_ENABLED` does not gate this flow.** Gating it would remove the only recovery path whenever the flag is off.
+- **Sessions are JWTs, so a reset cannot revoke one.** An attacker already holding a valid cookie keeps it until expiry. Noted, not solved.
+- **The password policy uses composition rules on user instruction, against NIST SP 800-63B**, which warns they produce `Password1!`. The weak-base blocklist is the part that earns its keep: `Password12345` satisfies every composition rule and is rejected. Letter classes are `\p{Lu}` / `\p{Ll}`, not `[A-Z]` — `Ą` has to count as a capital in a Polish app.
+- **One `PASSWORD_REQUIREMENTS` list drives both the Zod checks and the on-screen checklist**, so they cannot drift into telling the user different things. `superRefine` reports every unmet rule at once rather than stopping at the first.
+- **`PasswordField` tracks its own value in local state rather than the form's `watch()`.** `watch` trips `react-hooks/incompatible-library`, and local state keeps typing re-renders inside the field. The checklist appears only once the field is in error and clears itself when the password becomes valid.
+- **The reveal button is `type='button'` with `tabIndex={-1}`.** A bare `<button>` inside a form submits it; the toggle exposes nothing a screen-reader user cannot already read, and sitting between the field and submit it would add a stop to every keyboard pass.
+- **`tsc` type-checks `scripts/` even though it is gitignored** — which is what caught `Subscription.status` and `Apiary.location` being nullable in the SQL generator.
+
+**Verified** against the Neon **development** branch and in the browser at 1440×900. API: malformed JSON, invalid address, unknown address (no token written), a known address with mixed case and whitespace normalised, a second request replacing the first token, superseded / unknown / empty / missing tokens, short and mismatched passwords, and each new password rule rejected with its own message. A successful reset changed the `$2b$10$` hash, left `emailVerified` intact, deleted only the reset token, and a replay returned 400 with the password unchanged. Expiry returned 400 and cleaned the row. An OAuth-only account (`passwordHash: null`) gained a password; an unverified account came back stamped. Browser: the full forgot → link → reset → `/sign-in?reset=1` → sign-in loop, the requirements checklist ticking live as the password is typed, both reset-form toggles independent, and a 44×44 touch target. Resend accepted a real message to the key owner's address. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (353 tests) and `next build` all green; both new routes are `ƒ`.
+
+**Demo account rebuilt in the same session.** `demo@getapiary.app` / `demo1234` no longer satisfies the policy the app enforces, so it moved to `demo@hivewise.app` / `Demo2026Miodowy`. Dev was purged and reseeded through `db:purge-users` + `db:seed-demo`. **Production was applied by the user**, who ran a generated SQL script in the Neon console and confirmed the account: the sandbox blocked every path to a prod connection string, so `scripts/gen-demo-sql.ts` replays the seeded dev rows as literal SQL, wrapped in `BEGIN`/`COMMIT` and date-relative via `now() - interval` so the dashboard states do not drift. All four prod users were deleted, including a second tester's, on explicit confirmation.
+
+**Left open:** **No rate limiting on `/forgot-password`** — the classic mail-spam vector, joining the two unthrottled re-send actions. **Resend still cannot mail anyone but the API key owner**: `FROM` is the hardcoded `onboarding@resend.dev`, so a reset link reaches nobody else until a domain is verified at resend.com/domains and that constant is changed. Vercel still needs `RESEND_API_KEY`, `APP_URL` and `EMAIL_VERIFICATION_ENABLED`; without `APP_URL` the reset link points at `localhost:3000`. Timing still separates a known address from an unknown one, since only the found branch mails. **The generated `scripts/seed-demo.sql` carries a bcrypt hash and is gitignored**, along with `gen-demo-sql.ts` — their `package.json` siblings still point at files absent from a fresh checkout. `/profile` still does not exist, and `events.linkAccount` is still unexercised against a live Google consent.
