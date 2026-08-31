@@ -1,16 +1,50 @@
-# Current Feature
+# Current Feature: Voice Panel Scroll Lock
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- Closing the voice conversation while it is expanded never leaves the page unscrollable. Verified with **real wheel and keyboard input** — `window.scrollTo` works even while locked and proves nothing.
+- `document.body.style.overflow` returns to its pre-open value in every close order: collapse-then-close, and close-while-expanded.
+- Reopening the conversation after a close starts docked, not full screen.
+- The lock still does its original job: while the conversation is expanded, the page behind it does not scroll.
+- Leaving the form — back to the hive picker, or reaching the summary step — can never strand a lock, whichever child set it.
+- No second scroll-locker can inherit the same bug: the restore stops depending on a captured previous value.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+Full spec: `context/fixes/voice-panel-scroll-lock.md` — symptom table, measurements, and the two supporting observations.
+
+### The bug in one line
+
+`app/components/inspection/VoicePanel.tsx` keys its scroll-lock cleanup to `expanded`, but what takes the panel off the screen is `open`. Closing the conversation unmounts the `<section>` while `VoicePanel` itself stays mounted for its launcher button, so `expanded` never changes, the effect cleanup never runs, and `body { overflow: hidden }` survives with no chevron left in the document to undo it.
+
+### Plan
+
+1. Key the lock to `open && expanded` rather than `expanded`.
+2. Reset `expanded` when `open` goes false, so the next conversation opens docked.
+3. Restore `''` instead of a captured `previous` — or move the lock behind a counted helper in `app/lib/`. Capture-and-restore is only correct while exactly one thing in the app locks scroll; a second locker would capture `'hidden'` and restore `'hidden'` forever.
+4. Unmount safety net in `InspectionForm`: `useEffect(() => () => { document.body.style.overflow = ''; }, [])`.
+
+1 and 2 are the fix; 3 and 4 stop it recurring.
+
+### Traps
+
+- **`window.scrollTo` still works while locked.** `overflow: hidden` blocks user scrolling only, so a console poke reports a healthy page. Every check — before and after — must use a real wheel event, the `End` key, or touch.
+- **The panel needs Android-Chrome speech to appear at all.** `isSpeechSupported()` wants `SpeechRecognition`/`webkitSpeechRecognition` plus `speechSynthesis`, and `useSpeechIO` reads it through a `useMemo(…, [])`. To exercise this in a desktop browser: stub the constructor on `window`, then force `InspectionForm` to remount (← Ule, then re-enter a hive) so the memo re-runs.
+- **`close` takes two presses while a run is live** — `running ? onStop() : onDismiss()` — so a repro script that clicks it once may find the panel still open.
+- **Nothing here is unit-testable** under the repo's rule that Vitest covers `app/lib/` only. If step 3 becomes a counted helper in `app/lib/`, that helper should get a suite: nested locks, unbalanced release, restore-to-empty.
+
+### Build notes
+
+- **The fix landed as a component extraction, not the spec's two patches.** The spec proposed keying the lock to `open && expanded` plus resetting `expanded` when `open` goes false. The reset needs `setState` inside an effect, which `react-hooks/set-state-in-effect` rejects — and the rule was pointing at the real answer. The conversation `<section>` moved into its own `Conversation` component that mounts only while `open`, so `expanded` and the lock both live exactly as long as the bar is on screen. React's own unmount cleanup then does the work, the reset is free, and the class of bug is gone rather than patched.
+- **`app/lib/scroll-lock.ts` is counted, and the count needed an epoch too.** A release handed out before `releaseAllScrollLocks()` used to decrement the fresh count — driving it to `-1`, after which the *next* lock found a non-zero depth and never set `overflow: hidden` at all. React unmounts parent-first, so the form's safety net firing before the panel's release is the ordinary case, not a corner. Each release now carries the epoch it was issued in and ignores itself if that epoch has moved. **The test caught this**, not review.
+- **Restoring `''` rather than a captured previous value is the point of the helper.** Capture-and-restore is correct only while exactly one thing locks; a second locker captures `'hidden'` and puts `'hidden'` back for good — the same bug with no single-component fix.
+- **First jsdom suite in the repo.** `vitest.config.mts` already anticipated it: `environment: 'node'` with a `// @vitest-environment jsdom` opt-in per file. 12 tests, suite 432 → 444.
+- **`window.scrollTo` works while locked**, so it cannot verify any of this. `overflow: hidden` blocks user scrolling only. Every measurement below used a real wheel event and the `End` key.
+- **The unmount safety net cannot be reached by clicking**, and that is fine. To strand a lock you must navigate away while the chat is full screen — but full screen covers every navigation control, by design. It exists for future code paths, and `releaseAllScrollLocks` is covered by the unit suite instead. A Playwright attempt to click `← Ule` through the expanded panel is what surfaced this.
 
 ## History
 

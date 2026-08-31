@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { lockBodyScroll } from '../../lib/scroll-lock';
 import type { DialogueTurn } from '../../lib/voice/useDialogueRuntime';
 
 /**
@@ -114,6 +115,134 @@ function Bubble({ turn }: { turn: DialogueTurn }) {
 	);
 }
 
+interface ConversationProps {
+	title: string;
+	hint: string;
+	running: boolean;
+	listening: boolean;
+	log: DialogueTurn[];
+	error: string | null;
+	summary?: string | null;
+	onClose: () => void;
+}
+
+/**
+ * The docked conversation, mounted only while there is one.
+ *
+ * Its own component so that `expanded` — and the scroll lock keyed to it — live
+ * exactly as long as the bar is on screen. Held in `VoicePanel`, which stays
+ * mounted for its launcher, closing the conversation would never run the
+ * effect's cleanup and the page would stay locked with nothing left to unlock it.
+ */
+function Conversation({ title, hint, running, listening, log, error, summary, onClose }: ConversationProps) {
+	const [expanded, setExpanded] = useState(false);
+
+	// Full screen means the conversation is the only thing scrolling; without
+	// this the page behind keeps moving under the finger once the log hits an end.
+	useEffect(() => {
+		if (!expanded) return;
+		return lockBodyScroll();
+	}, [expanded]);
+
+	// Keep the newest turn in view, the way a chat thread does.
+	const logRef = useRef<HTMLDivElement>(null);
+	/**
+	 * Whether to follow new turns. Recorded while the beekeeper scrolls rather
+	 * than measured when a turn arrives: by then the new bubble is already in the
+	 * DOM, and a tall read-back would look like deliberate scrolling away and
+	 * cancel its own scroll.
+	 */
+	const followRef = useRef(true);
+
+	useEffect(() => {
+		const node = logRef.current;
+		if (node && followRef.current) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+	}, [log.length, running, expanded]);
+
+	return (
+		<section
+			aria-label='Rozmowa'
+			className={`fixed inset-x-0 bottom-0 z-40 flex flex-col border-t border-border bg-surface ${expanded ? 'top-0 z-50' : ''}`}
+		>
+			{/* Same max-width and gutters as the page, so the bar is full bleed
+			    but its contents line up with the form above it. The gutters grow
+			    to clear the safe area, which on a phone in landscape is where the
+			    rounded corner would otherwise cut into a right-aligned bubble. */}
+			<div
+				className={`mx-auto flex w-full max-w-6xl flex-col ${expanded ? 'h-full' : ''}`}
+				style={{
+					paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+					paddingRight: 'max(1rem, env(safe-area-inset-right))',
+				}}
+			>
+				<header className='flex items-center justify-between gap-3 py-2.5'>
+					<div className='flex min-w-0 flex-col'>
+						<span className='flex items-center gap-2 text-sm font-semibold text-foreground'>
+							<MicIcon className='h-4 w-4 text-muted' />
+							{title}
+						</span>
+						{/* The captured answers when there are any, the vocabulary
+						    hint until then. */}
+						<span className={`truncate text-xs ${summary ? 'text-muted' : 'text-subtle'}`}>{summary || hint}</span>
+					</div>
+					<button
+						type='button'
+						onClick={() => setExpanded((current) => !current)}
+						aria-expanded={expanded}
+						className='flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 text-sm text-muted transition-colors hover:bg-surface-3 hover:text-foreground'
+					>
+						<ChevronIcon up={!expanded} />
+						<span className='sr-only'>{expanded ? 'Zwiń rozmowę' : 'Rozwiń rozmowę'}</span>
+					</button>
+					<button
+						type='button'
+						onClick={onClose}
+						className='flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 text-sm font-medium text-muted transition-colors hover:bg-surface-3 hover:text-foreground'
+					>
+						<StopIcon className='h-4 w-4' />
+						{running ? 'Stop' : 'Zamknij'}
+					</button>
+				</header>
+
+				{/* Scrolling on one axis clips the other, and a bubble's ring and
+				    shadow sit outside its border box — so without a little room here
+				    the right edge of every reply is shaved off. */}
+				<div
+					ref={logRef}
+					onScroll={(event) => {
+						const node = event.currentTarget;
+						followRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
+					}}
+					className={`flex flex-col gap-2.5 overflow-y-auto overscroll-contain border-t border-border/60 px-1.5 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
+				>
+					{log.map((turn, position) => (
+						<Bubble
+							key={`${position}-${turn.text}`}
+							turn={turn}
+						/>
+					))}
+					{/* Waiting on the beekeeper, so it sits where their reply will.
+					    Between reopens the mic is shut and anything said is lost, so
+					    that stretch says so instead of pulsing as though it were
+					    hearing something. */}
+					{running && (
+						<div className='flex justify-end'>
+							<span className='rounded-2xl rounded-br-md bg-accent/15 px-4 py-2.5 ring-1 ring-accent/30'>
+								{listening ? <Listening /> : <span className='text-sm text-muted'>Chwila…</span>}
+							</span>
+						</div>
+					)}
+				</div>
+
+				{error && <p className='pb-1 text-sm text-danger'>{error}</p>}
+
+				{/* Clears the home indicator on a phone. */}
+				<div className='h-[max(0.25rem,env(safe-area-inset-bottom))]' />
+			</div>
+		</section>
+	);
+}
+
 export function VoicePanel({
 	title,
 	hint,
@@ -146,36 +275,6 @@ export function VoicePanel({
 	/** What has been captured so far — the same words the read-back speaks. */
 	summary?: string | null;
 }) {
-	// Whether the conversation fills the screen. Purely how the bar is displayed,
-	// so it stays here rather than being lifted with `open`.
-	const [expanded, setExpanded] = useState(false);
-
-	// Full screen means the conversation is the only thing scrolling; without
-	// this the page behind keeps moving under the finger once the log hits an end.
-	useEffect(() => {
-		if (!expanded) return;
-		const previous = document.body.style.overflow;
-		document.body.style.overflow = 'hidden';
-		return () => {
-			document.body.style.overflow = previous;
-		};
-	}, [expanded]);
-
-	// Keep the newest turn in view, the way a chat thread does.
-	const logRef = useRef<HTMLDivElement>(null);
-	/**
-	 * Whether to follow new turns. Recorded while the beekeeper scrolls rather
-	 * than measured when a turn arrives: by then the new bubble is already in the
-	 * DOM, and a tall read-back would look like deliberate scrolling away and
-	 * cancel its own scroll.
-	 */
-	const followRef = useRef(true);
-
-	useEffect(() => {
-		const node = logRef.current;
-		if (node && followRef.current) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
-	}, [log.length, running, expanded]);
-
 	if (!supported) return <p className='text-xs text-subtle'>{unsupportedNote}</p>;
 
 	const close = () => (running ? onStop() : onDismiss());
@@ -194,86 +293,16 @@ export function VoicePanel({
 			</button>
 
 			{open && (
-				<section
-					aria-label='Rozmowa'
-					className={`fixed inset-x-0 bottom-0 z-40 flex flex-col border-t border-border bg-surface ${expanded ? 'top-0 z-50' : ''}`}
-				>
-					{/* Same max-width and gutters as the page, so the bar is full bleed
-					    but its contents line up with the form above it. The gutters grow
-					    to clear the safe area, which on a phone in landscape is where the
-					    rounded corner would otherwise cut into a right-aligned bubble. */}
-					<div
-						className={`mx-auto flex w-full max-w-6xl flex-col ${expanded ? 'h-full' : ''}`}
-						style={{
-							paddingLeft: 'max(1rem, env(safe-area-inset-left))',
-							paddingRight: 'max(1rem, env(safe-area-inset-right))',
-						}}
-					>
-						<header className='flex items-center justify-between gap-3 py-2.5'>
-							<div className='flex min-w-0 flex-col'>
-								<span className='flex items-center gap-2 text-sm font-semibold text-foreground'>
-									<MicIcon className='h-4 w-4 text-muted' />
-									{title}
-								</span>
-								{/* The captured answers when there are any, the vocabulary
-								    hint until then. */}
-								<span className={`truncate text-xs ${summary ? 'text-muted' : 'text-subtle'}`}>{summary || hint}</span>
-							</div>
-							<button
-								type='button'
-								onClick={() => setExpanded((current) => !current)}
-								aria-expanded={expanded}
-								className='flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 text-sm text-muted transition-colors hover:bg-surface-3 hover:text-foreground'
-							>
-								<ChevronIcon up={!expanded} />
-								<span className='sr-only'>{expanded ? 'Zwiń rozmowę' : 'Rozwiń rozmowę'}</span>
-							</button>
-							<button
-								type='button'
-								onClick={close}
-								className='flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 text-sm font-medium text-muted transition-colors hover:bg-surface-3 hover:text-foreground'
-							>
-								<StopIcon className='h-4 w-4' />
-								{running ? 'Stop' : 'Zamknij'}
-							</button>
-						</header>
-
-						{/* Scrolling on one axis clips the other, and a bubble's ring and
-						    shadow sit outside its border box — so without a little room here
-						    the right edge of every reply is shaved off. */}
-						<div
-							ref={logRef}
-							onScroll={(event) => {
-								const node = event.currentTarget;
-								followRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
-							}}
-							className={`flex flex-col gap-2.5 overflow-y-auto overscroll-contain border-t border-border/60 px-1.5 py-3 ${expanded ? 'min-h-0 flex-1' : 'max-h-[40dvh]'}`}
-						>
-							{log.map((turn, position) => (
-								<Bubble
-									key={`${position}-${turn.text}`}
-									turn={turn}
-								/>
-							))}
-							{/* Waiting on the beekeeper, so it sits where their reply will.
-							    Between reopens the mic is shut and anything said is lost, so
-							    that stretch says so instead of pulsing as though it were
-							    hearing something. */}
-							{running && (
-								<div className='flex justify-end'>
-									<span className='rounded-2xl rounded-br-md bg-accent/15 px-4 py-2.5 ring-1 ring-accent/30'>
-										{listening ? <Listening /> : <span className='text-sm text-muted'>Chwila…</span>}
-									</span>
-								</div>
-							)}
-						</div>
-
-						{error && <p className='pb-1 text-sm text-danger'>{error}</p>}
-
-						{/* Clears the home indicator on a phone. */}
-						<div className='h-[max(0.25rem,env(safe-area-inset-bottom))]' />
-					</div>
-				</section>
+				<Conversation
+					title={title}
+					hint={hint}
+					running={running}
+					listening={listening}
+					log={log}
+					error={error}
+					summary={summary}
+					onClose={close}
+				/>
 			)}
 		</>
 	);

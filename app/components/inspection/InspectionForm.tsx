@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FormProvider, useForm, type FieldPath } from 'react-hook-form';
 
 import { fetchCurrentWeather, type InspectionWeather } from '../../lib/inspection-context';
+import { releaseAllScrollLocks } from '../../lib/scroll-lock';
 import { useInspectionDialogue } from '../../lib/voice/useInspectionDialogue';
 import { runCombStep } from '../../lib/voice/runCombStep';
 import { CombViewContext } from './comb-view';
@@ -110,6 +111,11 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	// The conversation bar is docked rather than overlaid, so the form reserves
 	// room for it instead of letting it cover the controls.
 	const voiceOpen = dialogue.running || (dialogue.log.length > 0 && !transcriptDismissed);
+
+	// Nothing inside the form may strand a scroll lock on the way out: an
+	// unscrollable page hides the step buttons, and the only recovery is a reload
+	// that costs the whole inspection.
+	useEffect(() => releaseAllScrollLocks, []);
 
 	// Keep the screen on the field being asked. Imperative because scrolling is,
 	// and because a ring on one element is not worth threading through every
