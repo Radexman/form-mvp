@@ -1,50 +1,16 @@
-# Current Feature: Voice Panel Scroll Lock
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Closing the voice conversation while it is expanded never leaves the page unscrollable. Verified with **real wheel and keyboard input** — `window.scrollTo` works even while locked and proves nothing.
-- `document.body.style.overflow` returns to its pre-open value in every close order: collapse-then-close, and close-while-expanded.
-- Reopening the conversation after a close starts docked, not full screen.
-- The lock still does its original job: while the conversation is expanded, the page behind it does not scroll.
-- Leaving the form — back to the hive picker, or reaching the summary step — can never strand a lock, whichever child set it.
-- No second scroll-locker can inherit the same bug: the restore stops depending on a captured previous value.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-Full spec: `context/fixes/voice-panel-scroll-lock.md` — symptom table, measurements, and the two supporting observations.
-
-### The bug in one line
-
-`app/components/inspection/VoicePanel.tsx` keys its scroll-lock cleanup to `expanded`, but what takes the panel off the screen is `open`. Closing the conversation unmounts the `<section>` while `VoicePanel` itself stays mounted for its launcher button, so `expanded` never changes, the effect cleanup never runs, and `body { overflow: hidden }` survives with no chevron left in the document to undo it.
-
-### Plan
-
-1. Key the lock to `open && expanded` rather than `expanded`.
-2. Reset `expanded` when `open` goes false, so the next conversation opens docked.
-3. Restore `''` instead of a captured `previous` — or move the lock behind a counted helper in `app/lib/`. Capture-and-restore is only correct while exactly one thing in the app locks scroll; a second locker would capture `'hidden'` and restore `'hidden'` forever.
-4. Unmount safety net in `InspectionForm`: `useEffect(() => () => { document.body.style.overflow = ''; }, [])`.
-
-1 and 2 are the fix; 3 and 4 stop it recurring.
-
-### Traps
-
-- **`window.scrollTo` still works while locked.** `overflow: hidden` blocks user scrolling only, so a console poke reports a healthy page. Every check — before and after — must use a real wheel event, the `End` key, or touch.
-- **The panel needs Android-Chrome speech to appear at all.** `isSpeechSupported()` wants `SpeechRecognition`/`webkitSpeechRecognition` plus `speechSynthesis`, and `useSpeechIO` reads it through a `useMemo(…, [])`. To exercise this in a desktop browser: stub the constructor on `window`, then force `InspectionForm` to remount (← Ule, then re-enter a hive) so the memo re-runs.
-- **`close` takes two presses while a run is live** — `running ? onStop() : onDismiss()` — so a repro script that clicks it once may find the panel still open.
-- **Nothing here is unit-testable** under the repo's rule that Vitest covers `app/lib/` only. If step 3 becomes a counted helper in `app/lib/`, that helper should get a suite: nested locks, unbalanced release, restore-to-empty.
-
-### Build notes
-
-- **The fix landed as a component extraction, not the spec's two patches.** The spec proposed keying the lock to `open && expanded` plus resetting `expanded` when `open` goes false. The reset needs `setState` inside an effect, which `react-hooks/set-state-in-effect` rejects — and the rule was pointing at the real answer. The conversation `<section>` moved into its own `Conversation` component that mounts only while `open`, so `expanded` and the lock both live exactly as long as the bar is on screen. React's own unmount cleanup then does the work, the reset is free, and the class of bug is gone rather than patched.
-- **`app/lib/scroll-lock.ts` is counted, and the count needed an epoch too.** A release handed out before `releaseAllScrollLocks()` used to decrement the fresh count — driving it to `-1`, after which the *next* lock found a non-zero depth and never set `overflow: hidden` at all. React unmounts parent-first, so the form's safety net firing before the panel's release is the ordinary case, not a corner. Each release now carries the epoch it was issued in and ignores itself if that epoch has moved. **The test caught this**, not review.
-- **Restoring `''` rather than a captured previous value is the point of the helper.** Capture-and-restore is correct only while exactly one thing locks; a second locker captures `'hidden'` and puts `'hidden'` back for good — the same bug with no single-component fix.
-- **First jsdom suite in the repo.** `vitest.config.mts` already anticipated it: `environment: 'node'` with a `// @vitest-environment jsdom` opt-in per file. 12 tests, suite 432 → 444.
-- **`window.scrollTo` works while locked**, so it cannot verify any of this. `overflow: hidden` blocks user scrolling only. Every measurement below used a real wheel event and the `End` key.
-- **The unmount safety net cannot be reached by clicking**, and that is fine. To strand a lock you must navigate away while the chat is full screen — but full screen covers every navigation control, by design. It exists for future code paths, and `releaseAllScrollLocks` is covered by the unit suite instead. A Playwright attempt to click `← Ule` through the expanded panel is what surfaced this.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -421,3 +387,28 @@ The drifting comb from the auth screens extracted into a reusable layer and appl
 **Verified** on a production build at 320 / 390 / 768 / 1440, against the Neon **development** branch. Auth: the drift measured seamless (`translateX(59.995px)` at 11999ms, `0` at 12000ms — matching Auth Phase 3's original measurement), the layer 780px wide inside a 720px half, `prefers-reduced-motion: reduce` still resolving to `animation: none`. Signed in: two backdrops coexisting on `/dashboard` with **zero SVG ids in the document** and no duplicate-id or console warnings, `document.scrollWidth === innerWidth` and no element past the viewport at any of the four widths, the active nav item's `border-l-accent` and `bg-accent/5` still reading over the comb, every card hairline intact. Checked with the seeded demo account and a throwaway no-apiary account for the empty state, deleted afterwards. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (432 tests) and `next build` all green.
 
 **Left open:** **`fade` has no two-ended variant**, so a surface wanting the pattern clear at both the top and the bottom cannot express it — the sidebar wanted this and settled for `top`. **No responsive control:** `opacity` and `tile` are single values, so the profile card carries the same 0.08 at 390px, where the card is full of text, as at 1440px where it is mostly empty; `className` can carry a responsive `opacity-*` utility if that ever matters. The `debug` prop was written but never exercised in the browser. **Running a production build on a non-3000 port needs `AUTH_TRUST_HOST=true`** or the credentials callback 500s with `UntrustedHost` — pre-existing, unrelated to this feature, but it costs a confused minute every time. Everything the previous features left open still stands: no rate limiting on `/forgot-password`, the two re-send actions or `/api/account/change-password`; the register route still has no tests; Vercel still needs `RESEND_API_KEY`, `APP_URL` and `EMAIL_VERIFICATION_ENABLED`; Resend still cannot mail anyone but the API key owner; `/analytics` and `/settings` still 404; and `events.linkAccount` is still unexercised against a live Google consent.
+
+### Voice Panel Scroll Lock — completed 2026-08-31
+
+Expanding the voice chat to full screen and closing it without collapsing first left the page permanently unscrollable, with a reload — and the whole inspection — as the only way out. Merged to `main` as `bbbab25` (fix commit `23ac1b0`).
+
+**Delivered**
+
+- `app/lib/scroll-lock.ts` — `lockBodyScroll()` returning a release, `releaseAllScrollLocks()` for unmount paths, `scrollLockDepth()` as a test seam. `scroll-lock.test.ts`, 12 tests. Suite 432 → 444.
+- `app/components/inspection/VoicePanel.tsx` — the docked conversation extracted as a `Conversation` component that mounts only while `open`; it owns `expanded`, the scroll lock and the follow-the-newest-turn behaviour. `VoicePanel` keeps the launcher and the unsupported note.
+- `app/components/inspection/InspectionForm.tsx` — `useEffect(() => releaseAllScrollLocks, [])`, a safety net so nothing inside the form can strand a lock on the way out.
+
+**No schema, dependency or config change.** jsdom was already a devDependency and `vitest.config.mts` already documented the `// @vitest-environment jsdom` opt-in; this is the first suite to use it.
+
+**Decisions worth remembering**
+
+- **The bug was a cleanup keyed to the wrong variable.** The effect watched `expanded`, but what takes the panel off screen is `open`. `VoicePanel` stays mounted for its launcher button, so closing the conversation changed neither `expanded` nor the mounted-ness of the component — the cleanup never ran, and the chevron that would have undone it was gone with the panel. **The general shape: an effect that owns a global side effect must be keyed to whether the thing is on screen, not to a flag that merely describes it.**
+- **The fix is an extraction, not the two patches the spec proposed.** Keying on `open && expanded` plus resetting `expanded` when `open` goes false needs `setState` inside an effect, which `react-hooks/set-state-in-effect` rejects — and the rule was pointing at the better answer. A component that only exists while the bar is on screen gets the release from React's own unmount cleanup and the docked-on-reopen reset for free.
+- **The lock is counted, not captured.** Remember-and-restore is correct only while exactly one thing in the app locks scroll; the second locker records `'hidden'` as its "previous" and puts `'hidden'` back for good, which is this same bug with no single-component fix. The helper restores `''` outright.
+- **Releases carry an epoch, and a test is what found the need.** React unmounts parent-first, so `InspectionForm`'s `releaseAllScrollLocks` runs *before* the panel's own release. Without the epoch that late release decremented the fresh count to `-1`, after which the next `lockBodyScroll()` saw a non-zero depth and never set `overflow: hidden` at all — the lock silently stops working. A release now ignores itself once the epoch has moved.
+- **`window.scrollTo` works while locked, so it cannot verify any of this.** `overflow: hidden` blocks *user* scrolling only. Any check — here or in future — must use a real wheel event, the `End` key or touch. This is what makes the bug easy to dismiss from a console.
+- **Exercising the panel on a desktop browser needs two steps**: stub `window.SpeechRecognition` (`isSpeechSupported()` wants it plus `speechSynthesis`), *then* force `InspectionForm` to remount, because `useSpeechIO` reads support through a `useMemo(…, [])`. `← Ule` and back into a hive does it.
+
+**Verified** on a production build at 390×844 with real wheel and keyboard input. Untouched page: wheel → 700, `End` → 1165. Chat expanded: `overflow: hidden`, wheel → 0, `End` → 0 — the lock still does its original job. Closed while expanded: panel gone, `overflow` unset, wheel → 700, `End` → 1165, matching the untouched baseline. Reopening after that close comes back **docked** (`aria-expanded="false"`, not covering the viewport). Collapse-then-close stays clean at every step. Leaving the form with the chat open lands on the hive picker with no lock. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (444 tests) and `next build` all green.
+
+**Left open:** **`context/fixes/` is untracked by user decision** — both `voice-panel-scroll-lock.md` and `pdf-submit-silent-failure.md` exist on disk only, so the Notes reference above points at a file absent from a fresh checkout, the same wart `scripts/gen-demo-sql.ts` already has. One `git add context/fixes` reverses it. **The `pdf-submit-silent-failure.md` fix is written up but not implemented** — "Zapisz i pobierz PDF" still does nothing at all when the form is invalid, which remains the more damaging of the two bugs found this session. **The unmount safety net is unreachable by clicking**: stranding a lock requires navigating away while the chat is full screen, and full screen covers every navigation control by design, so it is covered by the unit suite rather than in the browser. **Form state is still not persisted**, so any reload — including the one this bug used to force — costs the entire inspection; that is the fix that would make both of this session's bugs annoying rather than catastrophic. The form also keeps its `pb-[46dvh]` while `voiceOpen`, including on the summary step where `VoicePanel` is not rendered at all; harmless padding today.
