@@ -1,9 +1,9 @@
 'use client';
 
-import { Steps, useSteps } from '@ark-ui/react';
+import { Steps, useSteps, type UseStepsReturn } from '@ark-ui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FormProvider, useForm, type FieldPath } from 'react-hook-form';
+import { FormProvider, useForm, type FieldErrors, type FieldPath } from 'react-hook-form';
 
 import { fetchCurrentWeather, type InspectionWeather } from '../../lib/inspection-context';
 import { releaseAllScrollLocks } from '../../lib/scroll-lock';
@@ -17,6 +17,7 @@ import type { Beehive } from '../../lib/beehives';
 import { buildInspectionPayload } from './payload';
 import { buildMeta } from './summary.helpers';
 import { defaultValues, fullSchema, STEP_META, stepFields, type FormValues } from './schema';
+import { describeInvalidSteps, markValidatedSteps, stepOfField, stepsWithErrors } from './validation';
 import { StepBrood } from './steps/brood/StepBrood';
 import { StepQueen } from './steps/queen/StepQueen';
 import { StepColony } from './steps/colony/StepColony';
@@ -62,6 +63,10 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 
 	const validatedSteps = useRef<Set<number>>(new Set());
 	const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'error'>('idle');
+	// Every field-level message is inside a step panel, and the stepper hides
+	// every panel but the current one — so anything the beekeeper needs to read
+	// from the summary has to be said out here.
+	const [formError, setFormError] = useState<string | null>(null);
 	const [inspectionNumber, setInspectionNumber] = useState(String(hive.nextInspectionNumber));
 	const [weather, setWeather] = useState<InspectionWeather | null>(null);
 	const [weatherState, setWeatherState] = useState<WeatherState>('idle');
@@ -70,11 +75,52 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	// A finished transcript can be closed without stopping anything.
 	const [transcriptDismissed, setTranscriptDismissed] = useState(false);
 
+	// The stepper's own api, needed inside the onStepInvalid it is built with.
+	// The callback only ever runs from a click, long after this is filled in.
+	const stepsRef = useRef<UseStepsReturn | null>(null);
+
 	const steps = useSteps({
 		count: TOTAL_STEPS,
+		// Any navigation that actually happens answers whatever the message said.
+		onStepChange: () => setFormError(null),
 		isStepValid: (index) =>
 			index === SUMMARY_INDEX ? validatedSteps.current.size >= STEP_META.length : validatedSteps.current.has(index),
+		// A refused navigation is silent — the dead submit button in miniature.
+		// Re-check the step for real: let it through if it passes, name it if it
+		// does not, so the mark can never be more stale than the answer.
+		onStepInvalid: ({ step, targetStep }) => {
+			void (async () => {
+				const fields = stepFields[step];
+				if (fields && (await methods.trigger(fields))) {
+					validatedSteps.current.add(step);
+					if (targetStep === undefined) stepsRef.current?.goToNextStep();
+					else stepsRef.current?.setStep(targetStep);
+					return;
+				}
+				setFormError(describeInvalidSteps([step]));
+			})();
+		},
 	});
+
+	useEffect(() => {
+		stepsRef.current = steps;
+	});
+
+	// A step counts as validated only until its data changes. Without this,
+	// editing a section from the summary and returning by the step indicator
+	// carries the old mark and the edit is never re-checked.
+	useEffect(
+		() =>
+			methods.subscribe({
+				formState: { values: true },
+				callback: ({ name }) => {
+					if (!name) return;
+					const index = stepOfField(name);
+					if (index >= 0) validatedSteps.current.delete(index);
+				},
+			}),
+		[methods],
+	);
 
 	const currentStep = steps.value;
 	const isLastStep = currentStep === SUMMARY_INDEX;
@@ -84,11 +130,12 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 	const dialogue = useInspectionDialogue({
 		steps: STEP_META,
 		startIndex: () => Math.min(steps.value, STEP_META.length - 1),
-		goToStep: (index) => {
+		goToStep: async (index) => {
 			// Everything before the destination has been walked, so record it the
-			// way the Dalej button does — otherwise the stepper shows no progress
-			// and its triggers stay disabled after a spoken run.
-			for (let position = 0; position < index; position += 1) validatedSteps.current.add(position);
+			// way the Dalej button does — which means validating it. Walked is not
+			// valid: marking blind unlocks the summary for a spoken step whose
+			// answers the schema rejects, and submit then dies with no message.
+			await markValidatedSteps(index, validatedSteps.current, (fields) => methods.trigger(fields));
 			steps.setStep(index);
 		},
 		api: {
@@ -145,7 +192,10 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 
 	const handleNext = async () => {
 		const ok = await methods.trigger(stepFields[currentStep]);
-		if (!ok) return;
+		if (!ok) {
+			setFormError(describeInvalidSteps([currentStep]));
+			return;
+		}
 		validatedSteps.current.add(currentStep);
 		if (currentStep + 1 === SUMMARY_INDEX && weatherState === 'idle') {
 			loadWeather();
@@ -155,10 +205,21 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 
 	const handleEdit = (stepKey: string) => {
 		const index = STEP_META.findIndex((meta) => meta.key === stepKey);
-		if (index >= 0) steps.setStep(index);
+		if (index < 0) return;
+		steps.setStep(index);
 	};
 
-	const generatePdf = methods.handleSubmit(async (data) => {
+	const reportInvalid = (errors: FieldErrors<FormValues>) => {
+		const invalid = stepsWithErrors(errors);
+		for (const index of invalid) validatedSteps.current.delete(index);
+		setSubmitState('idle');
+		// Move first: the navigation clears the message, so it has to be said after.
+		if (invalid.length > 0) steps.setStep(invalid[0]);
+		setFormError(describeInvalidSteps(invalid));
+	};
+
+	const downloadPdf = async (data: FormValues) => {
+		setFormError(null);
 		setSubmitState('submitting');
 		try {
 			const context = { meta: buildMeta(hive.number, inspectionNumber), weather };
@@ -183,7 +244,11 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 			console.error('PDF generation failed:', error);
 			setSubmitState('error');
 		}
-	});
+	};
+
+	// Built on the click rather than during render: handleSubmit only reaches
+	// reportInvalid, and its ref, from inside the handler.
+	const generatePdf = () => void methods.handleSubmit(downloadPdf, reportInvalid)();
 
 	return (
 		<CombViewContext.Provider value={{ active: activeFrame, setActive: setActiveFrame }}>
@@ -294,8 +359,19 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 							<Steps.CompletedContent className='rounded-lg border border-accent-dim bg-surface p-6 text-foreground'>
 								Wszystkie kroki zostały ukończone.
 							</Steps.CompletedContent>
+							{formError && (
+								<p
+									role='alert'
+									className='rounded-md border border-danger-dim bg-danger/10 px-3 py-2 text-sm text-danger'
+								>
+									{formError}
+								</p>
+							)}
 							{submitState === 'error' && (
-								<p className='text-sm text-danger'>
+								<p
+									role='alert'
+									className='text-sm text-danger'
+								>
 									Nie udało się wygenerować PDF. Sprawdź połączenie i spróbuj ponownie.
 								</p>
 							)}

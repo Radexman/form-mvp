@@ -26,8 +26,11 @@ export interface InspectionDialogueOptions {
 	steps: StepRef[];
 	/** Index the walk should begin from — normally the step on screen. */
 	startIndex: () => number;
-	/** Move the form to a step; the walk keeps the screen in sync as it goes. */
-	goToStep: (index: number) => void;
+	/**
+	 * Move the form to a step; the walk keeps the screen in sync as it goes.
+	 * Awaited, so a navigator that has to validate first can do so.
+	 */
+	goToStep: (index: number) => void | Promise<void>;
 	api: FieldScriptApi;
 	/**
 	 * Steps with a hand-written dialogue, by key. They take the same runtime and
@@ -56,7 +59,9 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api, runner
 				};
 				// Through the ref on every call: the walk outlives the render it
 				// started in, and a captured navigator would move a stale stepper.
-				const go = (target: number) => depsRef.current.goToStep(target);
+				const go = async (target: number) => {
+					await depsRef.current.goToStep(target);
+				};
 
 				let index = Math.min(Math.max(depsRef.current.startIndex(), 0), list.length - 1);
 
@@ -80,7 +85,7 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api, runner
 							continue;
 						}
 						index -= 1;
-						go(index);
+						await go(index);
 						continue;
 					}
 
@@ -95,12 +100,12 @@ export function useInspectionDialogue({ steps, startIndex, goToStep, api, runner
 					if (answer?.kind === 'stop') return;
 					if (answer?.kind === 'back') {
 						index = Math.max(0, index - 1);
-						go(index);
+						await go(index);
 						continue;
 					}
 					if (answer?.kind === 'next') {
 						index += 1;
-						go(index);
+						await go(index);
 						continue;
 					}
 

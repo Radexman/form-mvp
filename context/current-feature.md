@@ -1,16 +1,43 @@
-# Current Feature
+# Current Feature: PDF Submit Silent Failure
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+- Tapping "Zapisz i pobierz PDF" on an invalid form shows a **visible** message on the summary screen naming the failing section, and moves the stepper to the first failing step — verified by asserting on rendered, non-zero-size text.
+- The happy path is unchanged: label still becomes "Generowanie…" on a valid submit, the existing `/api/generate-pdf` failure message still appears, and a valid inspection produces the same PDF as before.
+- A voice-driven walk can no longer unlock the summary for a step whose data does not validate.
+- Editing a section from the summary and returning via the step indicator re-validates that section.
+- `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` and `next build` all green.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+Spec: `context/fixes/pdf-submit-silent-failure.md`.
+
+**Symptom.** On Podsumowanie the submit button can be completely dead — label never changes, no request to `/api/generate-pdf`, no error on screen. Reported from the field as a phone-only failure that went through fine on desktop; reproduced on a production build.
+
+**Root cause — three things compound, all in `app/components/inspection/InspectionForm.tsx`:**
+
+1. `generatePdf = methods.handleSubmit(async (data) => …)` has no `onInvalid` second argument. Validation failure sets errors and returns silently; `setSubmitState('submitting')` lives inside the success branch, so the label cannot change and `fetch` is never reached.
+2. The only summary error line is gated on `submitState === 'error'`, which is set in the `catch` around `fetch` — a validation failure never reaches it.
+3. Ark UI renders non-current `Steps.Content` with `hidden`, so field-level messages sit in the DOM at 0×0 while the user is on the summary. There is no summary-level error list and nothing scrolls to the offending step.
+
+**Why the form was invalid at all — two routes reach the summary with data the full schema rejects** (`handleNext` validates via `methods.trigger(stepFields[currentStep])` and bails, so neither route goes through it):
+
+- **Voice (the phone-only one).** `useInspectionDialogue`'s `goToStep` marks every step below `index` as validated without validating any of them. `isStepValid(SUMMARY_INDEX)` only counts marks, so the summary unlocks. Voice is Chrome-on-Android only, which is exactly the reported phone/PC split; starting by voice and finishing by hand is enough.
+- **Editing from the summary** (device-independent). "Edytuj" a section, change something, then return by clicking the **Podsumowanie** indicator instead of "Dalej" — the count is still seven and nothing re-validates the edited step.
+
+**Fix, in order of importance:**
+
+1. Give `handleSubmit` an `onInvalid` handler: set an error state, name the wrong sections, move the stepper to the first failing step. This is the safety net and lands regardless of 2 and 3.
+2. Make the voice walk validate — `await methods.trigger(stepFields[position])` per step in `goToStep` and mark only what passes — or drop the marking entirely.
+3. Re-validate on the way back to the summary. Smallest version: remove the edited index from `validatedSteps` when `handleEdit` runs.
+
+**Out of scope:** the voice panel scroll lock (already done, see `voice-panel-scroll-lock.md`); persisting form state across reloads; any change to the schemas or to what counts as valid — nothing here relaxes a rule, the rules are fine and the reporting is not.
+
+**Testing note:** the failing-message assertions must check rendered size, not just presence — the existing hidden messages are in the DOM at 0×0, so a DOM query alone proves nothing.
 
 ## History
 
