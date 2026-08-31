@@ -1,43 +1,16 @@
-# Current Feature: PDF Submit Silent Failure
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Tapping "Zapisz i pobierz PDF" on an invalid form shows a **visible** message on the summary screen naming the failing section, and moves the stepper to the first failing step — verified by asserting on rendered, non-zero-size text.
-- The happy path is unchanged: label still becomes "Generowanie…" on a valid submit, the existing `/api/generate-pdf` failure message still appears, and a valid inspection produces the same PDF as before.
-- A voice-driven walk can no longer unlock the summary for a step whose data does not validate.
-- Editing a section from the summary and returning via the step indicator re-validates that section.
-- `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` and `next build` all green.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-Spec: `context/fixes/pdf-submit-silent-failure.md`.
-
-**Symptom.** On Podsumowanie the submit button can be completely dead — label never changes, no request to `/api/generate-pdf`, no error on screen. Reported from the field as a phone-only failure that went through fine on desktop; reproduced on a production build.
-
-**Root cause — three things compound, all in `app/components/inspection/InspectionForm.tsx`:**
-
-1. `generatePdf = methods.handleSubmit(async (data) => …)` has no `onInvalid` second argument. Validation failure sets errors and returns silently; `setSubmitState('submitting')` lives inside the success branch, so the label cannot change and `fetch` is never reached.
-2. The only summary error line is gated on `submitState === 'error'`, which is set in the `catch` around `fetch` — a validation failure never reaches it.
-3. Ark UI renders non-current `Steps.Content` with `hidden`, so field-level messages sit in the DOM at 0×0 while the user is on the summary. There is no summary-level error list and nothing scrolls to the offending step.
-
-**Why the form was invalid at all — two routes reach the summary with data the full schema rejects** (`handleNext` validates via `methods.trigger(stepFields[currentStep])` and bails, so neither route goes through it):
-
-- **Voice (the phone-only one).** `useInspectionDialogue`'s `goToStep` marks every step below `index` as validated without validating any of them. `isStepValid(SUMMARY_INDEX)` only counts marks, so the summary unlocks. Voice is Chrome-on-Android only, which is exactly the reported phone/PC split; starting by voice and finishing by hand is enough.
-- **Editing from the summary** (device-independent). "Edytuj" a section, change something, then return by clicking the **Podsumowanie** indicator instead of "Dalej" — the count is still seven and nothing re-validates the edited step.
-
-**Fix, in order of importance:**
-
-1. Give `handleSubmit` an `onInvalid` handler: set an error state, name the wrong sections, move the stepper to the first failing step. This is the safety net and lands regardless of 2 and 3.
-2. Make the voice walk validate — `await methods.trigger(stepFields[position])` per step in `goToStep` and mark only what passes — or drop the marking entirely.
-3. Re-validate on the way back to the summary. Smallest version: remove the edited index from `validatedSteps` when `handleEdit` runs.
-
-**Out of scope:** the voice panel scroll lock (already done, see `voice-panel-scroll-lock.md`); persisting form state across reloads; any change to the schemas or to what counts as valid — nothing here relaxes a rule, the rules are fine and the reporting is not.
-
-**Testing note:** the failing-message assertions must check rendered size, not just presence — the existing hidden messages are in the DOM at 0×0, so a DOM query alone proves nothing.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -439,3 +412,31 @@ Expanding the voice chat to full screen and closing it without collapsing first 
 **Verified** on a production build at 390×844 with real wheel and keyboard input. Untouched page: wheel → 700, `End` → 1165. Chat expanded: `overflow: hidden`, wheel → 0, `End` → 0 — the lock still does its original job. Closed while expanded: panel gone, `overflow` unset, wheel → 700, `End` → 1165, matching the untouched baseline. Reopening after that close comes back **docked** (`aria-expanded="false"`, not covering the viewport). Collapse-then-close stays clean at every step. Leaving the form with the chat open lands on the hive picker with no lock. `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (444 tests) and `next build` all green.
 
 **Left open:** **`context/fixes/` is untracked by user decision** — both `voice-panel-scroll-lock.md` and `pdf-submit-silent-failure.md` exist on disk only, so the Notes reference above points at a file absent from a fresh checkout, the same wart `scripts/gen-demo-sql.ts` already has. One `git add context/fixes` reverses it. **The `pdf-submit-silent-failure.md` fix is written up but not implemented** — "Zapisz i pobierz PDF" still does nothing at all when the form is invalid, which remains the more damaging of the two bugs found this session. **The unmount safety net is unreachable by clicking**: stranding a lock requires navigating away while the chat is full screen, and full screen covers every navigation control by design, so it is covered by the unit suite rather than in the browser. **Form state is still not persisted**, so any reload — including the one this bug used to force — costs the entire inspection; that is the fix that would make both of this session's bugs annoying rather than catastrophic. The form also keeps its `pb-[46dvh]` while `voiceOpen`, including on the summary step where `VoicePanel` is not rendered at all; harmless padding today.
+
+### PDF Submit Silent Failure — completed 2026-08-31
+
+On the summary, "Zapisz i pobierz PDF" could do nothing at all: no label change, no request, no error anywhere on screen. Merged to `main` as `1a3f49b` (fix commit `96ff1b8`).
+
+**Delivered**
+
+- `app/components/inspection/validation.ts` — `stepOfField`, `stepsWithErrors`, `describeInvalidSteps` (the Polish "Popraw błędy w sekcji: Matka." line) and `markValidatedSteps`. `validation.test.ts`, 11 tests.
+- `app/components/inspection/InspectionForm.tsx` — `handleSubmit` gained an `onInvalid` branch; the spoken walk validates before it marks; a step's mark expires when its data changes; a refused stepper navigation re-validates instead of failing silently. One `role='alert'` banner rendered outside every `Steps.Content`, beside the untouched request-failure line.
+- `app/lib/voice/useInspectionDialogue.ts` — `goToStep` may return a promise and the walk awaits it, so a navigator that has to validate first can.
+- `InspectionForm.test.tsx`, 7 jsdom tests — the first component suite in the project. Suite 444 → 462.
+- `context/fixes/` is now tracked (both spec files), reversing the wart the previous entry left open.
+
+**No schema, dependency or config change.** Nothing here relaxes a validation rule.
+
+**Decisions worth remembering**
+
+- **The stepper's guard is on the step you are *leaving*, not the one you are entering.** `isValidStepNavigation` in `@zag-js/steps` returns true for any `target <= current` and otherwise asks `isStepValid(current)`. So `isStepValid(SUMMARY_INDEX)` — the `size >= 7` count — never actually gates anything; what unlocks the summary is `validatedSteps.has(6)`, the mark on the step you press it from. The spec's reading was close but the mechanism matters for anyone changing this.
+- **A refused navigation is silent, which is the same bug in a new place.** Marking honestly means the stepper starts refusing clicks it used to allow, with nothing on screen. `onStepInvalid` is what makes that safe: it re-runs `methods.trigger` for real, lets the step through and marks it if it passes, and names it if it does not. That also self-heals a mark that went stale for any reason.
+- **Marks expire on edit, via `methods.subscribe`, not `methods.watch`.** `watch()` trips `react-hooks/incompatible-library` — the React Compiler refuses to memoize any component that calls it. `subscribe({ formState: { values: true } })` is the compiler-safe equivalent. Separately, `handleSubmit(onValid, onInvalid)` must be built inside the click handler, not during render, or `react-hooks/refs` errors on the ref the invalid branch touches.
+- **Expiring marks on *any* edit beats the spec's `handleEdit` deletion.** The spec's smallest version misses the route it names in its own acceptance criteria: leaving the summary by the **step indicator** rather than the "Edytuj" button never runs `handleEdit`, so the mark survives and the edit is never re-checked.
+- **After fixes 2 and 3, the invalid-submit branch is unreachable from the UI.** Every route to the summary now re-validates, and there are no cross-step schema rules, so a walk that passes each step's `trigger` passes the full schema. Three attempts to construct the state in a test — including a commit-timing race — were all correctly blocked. It stays as the net for whatever comes next (a future cross-step rule, a new navigation path), covered by unit tests for the message and mapping plus the four component tests that prove the same banner renders visibly.
+- **A control's value reaches the form a microtask after its click — sometimes.** Ark's `RadioGroup` lands a tick late; `Checkbox` and a `register`ed textarea land synchronously. A component test that clicks a radio and then something that validates must `await` between them, or it validates stale values. This cost an hour of chasing a phantom resolver bug.
+- **Role queries are the visibility assertion.** `getByRole` skips anything the accessibility tree hides, including `[hidden]` subtrees — which is exactly how the original messages were invisible. `getByText` alone would have passed on the broken build. The suite adds a `visible()` helper that re-checks for a hidden ancestor.
+
+**Verified** `tsc --noEmit`, `eslint`, `prettier --check .`, `vitest run` (462 tests, 25 files) and `next build` all green. The jsdom suite covers: a blocked navigation naming the section and staying put; Dalej refusing the same way; an edit re-validated on the way back by the step indicator, with both the banner and "Znakowana matka musi mieć kolor" asserted visible; a corrected step passing without a second click; a full seven-step walk reaching the summary unobstructed; a valid submit showing "Generowanie…" while the request is out and going quiet after; and the request-failure message still appearing on a 502.
+
+**Left open:** **No browser verification.** Everything above is the automated suite; the fix was not exercised on a production build against a phone, and the voice route in particular — the one that produced the reported failure — has no test at all, since `SpeechRecognition` does not exist in jsdom. **The spoken walk can now be blocked mid-conversation**: if a section's answers do not validate, the screen stays on it (with the banner naming it) while the dialogue carries on to the next section's questions. The answers still land in the form, but screen and voice are out of step until the beekeeper fixes the field. Whether that is better than the old silent laundering is a field question. **Editing a section and returning now costs the re-validation** — a real behaviour change beekeepers will notice, and the intended one. **Form state is still not persisted**, so a reload still costs the whole inspection; that remains the fix that would make this class of bug annoying rather than catastrophic. Everything the previous entries left open still stands, minus the `context/fixes/` tracking, which this one closes.
