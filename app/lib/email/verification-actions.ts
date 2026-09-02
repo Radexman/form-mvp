@@ -4,6 +4,8 @@ import { after } from 'next/server';
 
 import { auth } from '@/auth';
 import { prisma } from '@/app/lib/prisma';
+import { resendVerificationLimiter } from '@/app/lib/ratelimit';
+import { checkRateLimit, formatRetryAfter, getIp } from '@/app/lib/ratelimit-helpers';
 
 import { isEmailVerificationEnabled } from './config';
 import { issueVerificationEmail } from './issue-verification';
@@ -30,6 +32,12 @@ const DISABLED = 'Potwierdzanie adresu e-mail jest obecnie wyłączone.';
  * for anyone who can read the action id out of the page.
  */
 export async function resendVerificationAction(): Promise<ResendResult> {
+	const { limited, retryAfterSeconds } = await checkRateLimit(resendVerificationLimiter, await getIp());
+
+	if (limited) {
+		return { ok: false, message: `Możesz poprosić o nowy link za ${formatRetryAfter(retryAfterSeconds)}.` };
+	}
+
 	if (!isEmailVerificationEnabled()) {
 		return { ok: false, message: DISABLED };
 	}
@@ -73,6 +81,22 @@ export async function resendVerificationAction(): Promise<ResendResult> {
  * awaited. See the comment on it below.
  */
 export async function resendVerificationForEmailAction(email: string): Promise<ResendResult> {
+	/**
+	 * This is the action the limiter exists for. It mails whatever address it is
+	 * handed, from a signed-out page, so unthrottled it is an open relay for
+	 * anyone who can read an action id out of the page source.
+	 *
+	 * Keyed by IP rather than by the submitted address, which is what keeps it
+	 * compatible with the uniform answer below: being limited says something
+	 * about the caller, never about whether the address is registered. It also
+	 * runs before the branch, so both paths still cost the same round trip.
+	 */
+	const { limited, retryAfterSeconds } = await checkRateLimit(resendVerificationLimiter, await getIp());
+
+	if (limited) {
+		return { ok: false, message: `Możesz poprosić o nowy link za ${formatRetryAfter(retryAfterSeconds)}.` };
+	}
+
 	if (!isEmailVerificationEnabled()) {
 		return { ok: false, message: DISABLED };
 	}

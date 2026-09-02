@@ -1,16 +1,88 @@
-# Current Feature
+# Current Feature: Rate Limiting & Storage Security
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+Scope was narrowed at `/feature start` to the rate limiting half — see **Scope decision** in Notes. Branch: `feat/rate-limiting`.
+
+**Upstash rate limiting — in scope**
+
+- [x] `@upstash/ratelimit` + `@upstash/redis` installed; `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` documented in `.env.example`.
+- [x] `app/lib/ratelimit.ts` exports one `slidingWindow` limiter per threat surface, each with its own `prefix`, `analytics: true` and its own `ephemeralCache`.
+- [x] `app/lib/ratelimit-helpers.ts` exports `getIp()`, `checkRateLimit()`, `formatRetryAfter()` and `rateLimitedResponse()`.
+- [x] Every auth entry point rate-limits **first** — before Prisma and before bcrypt.
+- [x] Sign-in, register, resend-verification, forgot-password and reset-password each return a Polish message naming the retry delay.
+- [x] Forgot-password keeps its uniform response and its uniform *timing* — the limiter is IP-keyed and runs on both branches.
+- [x] PDF generation requires a session and is limited to 20/hour per `userId`.
+- [ ] Set both variables in Vercel. **Manual step — not done, and nothing is enforced in production until it is.**
+
+**Landing routing — added mid-feature**
+
+- [x] `/` sends signed-in users to `/dashboard` and everyone else to `/sign-in`.
+- [x] The inspection wizard moved off `/` to `/inspection`, behind a session.
+- [x] The dashboard topbar's "Nowy przegląd" button — previously an inert `<button>` — links there.
+
+**Deferred — needs persisted inspections first**
+
+- [ ] Monthly `UsagePeriod` quota (20 Free / 100 Premium) with `upgradeRequired`.
+- [ ] Private R2 bucket, bucket-scoped token, `lib/r2.ts` client.
+- [ ] Upload under `users/{userId}/inspections/{inspectionId}.pdf`, key stored in `PdfGenerationJob.fileUrl`.
+- [ ] 15-minute signed URLs behind a server-side ownership check.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+### Scope decision
+
+The spec's R2 and quota sections assume persisted inspections. They do not exist: `Inspection`, `PdfGenerationJob` and `UsagePeriod` are in `prisma/schema.prisma` but nothing writes them, and the PDF flow posts a form-built payload with no `inspectionId` anywhere. Building the ownership check and the job row would have meant inventing the whole inspection save path, which the spec assumes rather than describes.
+
+Chose to ship the auth surface and close the PDF endpoint now, and revisit R2 once inspections persist.
+
+### Limiter sizing — the rationale, since the file carries no comments
+
+A hook strips comments from newly created files, so `app/lib/ratelimit.ts` reads as bare configuration. Why each window is what it is:
+
+| Limiter | Window | Key | Why |
+| --- | --- | --- | --- |
+| `rl:login` | 5 / 1 min | IP | `authorize` bcrypt-compares on every attempt, so an unthrottled sign-in is both a credential-stuffing target and the cheapest way to pin our CPU. Five is above human need, far below useful automation. |
+| `rl:register` | 3 / 10 min | IP | The route answers 409 on a taken address — a leak it accepts as the price of a usable signup. That trade only holds while nobody can walk it in bulk. Also caps mass account creation and the mail each one sends. |
+| `rl:resend-verify` | 3 / 10 min | IP | `resendVerificationForEmailAction` mails a caller-supplied address from a signed-out page. Unthrottled it is an open relay, and burning the Resend domain reputation breaks real verification mail. |
+| `rl:password-reset` | 3 / 10 min | IP | Same relay risk on `/api/auth/forgot-password`. |
+| `rl:password-reset-submit` | 10 / 10 min | IP | **Added beyond the spec.** Separate bucket on purpose: sharing the mail bucket would mean asking for a second link (because the first never arrived) could leave a user without the budget to spend one. Locking someone out of a password reset is a support ticket, not a defence. Tokens are long random values, so this caps unauthenticated token-table lookups rather than guessing. |
+| `rl:pdf` | 20 / 1 h | **userId** | Beekeepers file from a phone on a network that rotates IPs; an IP limit punishes roaming and lets a fixed line through. The endpoint is authenticated, and the cost defended is per account — each call bills Render. |
+
+### Two decisions worth re-litigating if the threat model changes
+
+- **Missing Upstash credentials are a supported state, not an error.** `Redis.fromEnv()` would throw at module load, and because these limiters are imported by sign-in and register, that throw takes down authentication itself — on a fresh clone, in CI, and in any deployment where someone forgot a variable. So `ratelimit.ts` builds `null` limiters and `checkRateLimit` treats null as "allowed". The cost: forgetting the variables in Vercel ships unthrottled auth silently, mitigated only by a startup `console.warn` in production.
+- **Redis errors fail open.** If Upstash has an outage, failing closed would mean nobody can sign in, register or reset a password until a third party recovers — a total outage caused by a defensive layer. Failing open degrades to the protection level this app had last week. The trade is real: whoever can take Upstash down can also turn the limiters off. Defending that means accepting self-inflicted downtime instead, which is the worse deal for users logging in from a field.
+
+### What changed beyond adding limiters
+
+- **`/api/generate-pdf` was public.** `proxy.ts` deliberately excluded it from its matcher, so anyone who knew the path could bill the Render service with no account. It now calls `auth()` itself and answers 401. It enforces this in the route rather than by joining the proxy matcher, because Proxy answers a failed check with a redirect to the sign-in page and a `fetch` posting JSON needs a 401 it can read, not an HTML login form where a PDF was expected. The comment in `proxy.ts` was updated — it still claimed the route was public.
+- **`getIp()` prefers `x-vercel-forwarded-for`.** The spec's `x-forwarded-for.split(',')[0]` is correct behind Vercel, but it is a list a client can prepend to if a proxy ever appends rather than replaces — and an identifier the caller chooses is no identifier at all. The platform header cannot be set by the caller, so it wins; `x-forwarded-for` then `x-real-ip` are fallbacks.
+- **`getIp()` is async.** `headers()` returns a Promise in Next 16, so the spec's synchronous helper would not have compiled.
+- **`formatRetryAfter()` does Polish plurals properly.** Three forms, and the boundaries are not intuitive — 2–4 take `minuty`, 12–14 fall back to `minut`, 22–24 take `minuty` again. `za` takes the accusative, so `minutę` / `sekundę` in the singular. 32 tests cover it.
+- **`InspectionForm` surfaces 401 and 429 messages** in its existing `formError` banner instead of the generic "check your connection", which is all a 500 from the PDF service deserves.
+
+### The root route was the reason the PDF endpoint was reachable
+
+`app/page.tsx` rendered `InspectionApp` — the full inspection wizard — to anyone, signed in or not. That is *why* `/api/generate-pdf` had no session check and why `proxy.ts` listed it as public: the whole flow was public. Requiring auth on the endpoint and leaving the wizard on a public `/` would have broken the homepage, so the two changes only make sense together.
+
+`InspectionApp` had exactly one render site, so the wizard now lives at `/inspection`, outside the `(dashboard)` group. That group's shell puts a fixed tab bar at the bottom on phones and the wizard's voice panel claims 46dvh of the same space — they cannot share a screen without reworking one of them. It is reached from the topbar's "Nowy przegląd" button, which until now was an inert `<button>` with no handler.
+
+`/` is deliberately **not** in the proxy matcher. It has to render for anonymous visitors in order to redirect them; listing it would hand the anonymous branch to next-auth and the page would never run.
+
+### Verified
+
+`vitest run` 508 passing (27 files, 32 of them new), `tsc --noEmit` clean, `eslint .` clean, `next build` green.
+
+Routing smoke-tested against `next start` on :3000 with a minted session cookie — `/` anonymous → `/sign-in`, `/` signed in → `/dashboard`, `/inspection` anonymous → `/sign-in?callbackUrl=…`, `/inspection` signed in → 200, `POST /api/generate-pdf` anonymous → 401 with the Polish message. Note for anyone repeating this: `next start` needs `AUTH_TRUST_HOST=true` or Auth.js rejects localhost as an untrusted host and every session reads as anonymous. `next dev` does not.
+
+### Not in scope
+
+Network-level DDoS, analytics-endpoint limits, R2 versioning/deletion protection, PDF-access audit logging for GDPR, and IP allowlisting the Render microservice. `/api/account/change-password` is also unlimited — it is session-gated, so an attacker needs a valid session and can only attack their own account.
 
 ## History
 

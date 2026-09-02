@@ -228,6 +228,20 @@ export function InspectionForm({ hive, onBack }: { hive: Beehive; onBack: () => 
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(buildInspectionPayload(data, context)),
 			});
+			// 401 (session gone) and 429 (rate limited) are the two failures the user
+			// can actually do something about, and the route sends a sentence saying
+			// what. Everything else stays on the generic banner below, which is all
+			// a 500 from the PDF service deserves.
+			if (response.status === 401 || response.status === 429) {
+				const body: { error?: string } = await response.json().catch(() => ({}));
+
+				if (body.error) {
+					setFormError(body.error);
+					setSubmitState('idle');
+					return;
+				}
+			}
+
 			if (!response.ok) throw new Error(`Serwer odpowiedział ${response.status}`);
 
 			const blob = await response.blob();
