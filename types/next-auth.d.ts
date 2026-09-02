@@ -23,5 +23,16 @@ declare module 'next-auth' {
 declare module '@auth/core/jwt' {
 	interface JWT {
 		id?: string;
+
+		/**
+		 * When this token was issued, as epoch milliseconds, stamped on the
+		 * sign-in pass and never rewritten. The `jwt` callback compares it against
+		 * `User.passwordChangedAt` and drops the token if the password was written
+		 * after it — which is what makes a password change evict sessions.
+		 *
+		 * Deliberately not `iat`: Auth.js rewrites that claim as it rolls the
+		 * token, so it tracks the last refresh rather than the sign-in.
+		 */
+		pwdAt?: number;
 	}
 }

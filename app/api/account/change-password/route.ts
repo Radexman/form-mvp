@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import { changePasswordSchema } from '@/app/lib/auth.schema';
 import { passwordResetIdentifier } from '@/app/lib/email/password-reset-token';
+import { hashPassword } from '@/app/lib/password';
 import { prisma } from '@/app/lib/prisma';
 
 /**
@@ -14,10 +15,6 @@ import { prisma } from '@/app/lib/prisma';
  * arguments in the dev console — a password submitted through an action is
  * printed there in plaintext.
  */
-
-// Matches `prisma/seed.ts`, the register route and the reset route. A password
-// hashed at a different cost would still verify, but the drift would be silent.
-const BCRYPT_ROUNDS = 10;
 
 export async function POST(request: Request) {
 	const session = await auth();
@@ -80,7 +77,22 @@ export async function POST(request: Request) {
 
 	await prisma.user.update({
 		where: { id: session.user.id },
-		data: { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) },
+		data: {
+			passwordHash: await hashPassword(password),
+			/**
+			 * Every session issued before this moment stops working — see the `jwt`
+			 * callback in `auth.ts`. This is the point of the endpoint: someone
+			 * changing their password because they think it is known is trying to
+			 * evict whoever knows it, and until now the old cookie kept working for
+			 * up to the JWT's full lifetime.
+			 *
+			 * It also evicts *this* browser, which cannot be helped — a JWT carries
+			 * nothing that distinguishes the session making the request from any
+			 * other. `ChangePasswordForm` signs out and redirects on success so that
+			 * lands as an explained "sign in again" rather than a silent bounce.
+			 */
+			passwordChangedAt: new Date(),
+		},
 	});
 
 	/**

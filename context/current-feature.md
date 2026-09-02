@@ -1,16 +1,31 @@
-# Current Feature
+# Current Feature: Auth Security Review Fixes
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like. Populated by /feature load. -->
+Close every finding from `docs/audit-results/AUTH_SECURITY_REVIEW.md` (audited 2026-09-02) **except** rate limiting, which is deferred to its own feature.
+
+- **Close the timing-based user-enumeration channel** in `/api/auth/forgot-password` and `resendVerificationForEmailAction`. Both return a deliberately uniform response but `await` the Resend call inside the `if (user)` branch, so a registered address is measurably slower. Move the send into `after()` from `next/server` so both branches return in the same time. Dropping the `await` makes the `FAILED` return in the resend action unreachable — it should return `SENT` unconditionally once the send is scheduled.
+- **Invalidate live sessions when a password is written.** Add `passwordChangedAt` to `User`, stamp it in both `/api/account/change-password` and `/api/auth/reset-password`, put the issue time in the JWT at sign-in, and return `null` from the `jwt` callback when the token predates the stamp (`Awaitable<JWT | null>` is the supported invalidation path). Today a user who changes their password because they believe it is compromised does not evict the attacker's cookie for up to 30 days.
+- **Check `email_verified` before Google account linking.** `allowDangerousEmailAccountLinking: true` is justified in `auth.config.ts` on the grounds that Google verifies every address it returns, but Auth.js never reads that claim — it links on an email match alone. Add a `signIn` callback in `auth.ts` returning `profile?.email_verified === true` for the Google provider.
+- **Keep the sign-in password out of the dev terminal.** Next logs Server Function arguments by default in development, and `signInAction` takes `{ email, password }`. Either set `logging: { serverFunctions: false }` in `next.config.ts`, or finish the migration the reset and change-password routes already made and move sign-in to a route handler.
+- **Raise the bcrypt cost factor from 10 to 12** across all five write paths that hash: `app/api/auth/register/route.ts:24`, `app/api/auth/reset-password/route.ts:19`, `app/api/account/change-password/route.ts:20`, `prisma/seed.ts:17`, `prisma/create-account.ts:27`. Optionally re-hash on successful sign-in so existing accounts migrate rather than staying at 10 forever.
+- **Correct the `verificationToken` comment in `prisma/schema.prisma`.** It claims both fields are nulled when the link is consumed; `/api/auth/verify-email` deliberately leaves them and relies on `emailVerified` to make a spent token inert. Not exploitable today — the fix is making the documented invariant match the real one so a future reader does not build on a promise the code never kept.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from the spec. -->
+**Source:** `docs/audit-results/AUTH_SECURITY_REVIEW.md` — 4 Medium, 3 Low, no Critical or High. Every item below was traced to the code and confirmed; none are speculative.
+
+**Explicitly out of scope.** The audit's first Medium finding — no rate limiting on any auth endpoint — is deferred to the next feature. That is the single highest-impact item in the report, so it should follow immediately after this one rather than drifting.
+
+**Sequencing tension worth knowing about.** Raising the bcrypt cost makes every credentials sign-in attempt more expensive server-side, which is a mitigation against offline cracking but an amplifier for the unthrottled-request problem this feature is leaving open. The audit recommends landing the limiter first or alongside. Two reasonable calls: hold the bcrypt bump until the rate-limiting feature lands, or take it now and accept a slightly larger CPU-exhaustion window in the interim. Decide at `/feature start`.
+
+**What not to touch.** The audit's Passed Checks section lists a lot of deliberate, well-reasoned design — reset tokens single-use inside a transaction, null expiry failing closed, the 72-byte bcrypt cap measured in bytes, `authorize` disclosing no failure reason, the register route's documented 409 enumeration tradeoff. None of that is in scope; several of those behaviours look like bugs at a glance and are not.
+
+**Testing.** `app/lib/email/*` and `app/lib/auth.schema.ts` already have co-located Vitest suites, and `app/api/account/*` has route tests with a mocked Prisma. The session-invalidation change is the one with real branching logic (token older than stamp, no stamp, fresh sign-in) and should get coverage; the timing fix is better verified by reading than by asserting on wall-clock.
 
 ## History
 
