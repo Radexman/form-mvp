@@ -1,31 +1,16 @@
-# Current Feature: Auth Security Review Fixes
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-Close every finding from `docs/audit-results/AUTH_SECURITY_REVIEW.md` (audited 2026-09-02) **except** rate limiting, which is deferred to its own feature.
-
-- **Close the timing-based user-enumeration channel** in `/api/auth/forgot-password` and `resendVerificationForEmailAction`. Both return a deliberately uniform response but `await` the Resend call inside the `if (user)` branch, so a registered address is measurably slower. Move the send into `after()` from `next/server` so both branches return in the same time. Dropping the `await` makes the `FAILED` return in the resend action unreachable — it should return `SENT` unconditionally once the send is scheduled.
-- **Invalidate live sessions when a password is written.** Add `passwordChangedAt` to `User`, stamp it in both `/api/account/change-password` and `/api/auth/reset-password`, put the issue time in the JWT at sign-in, and return `null` from the `jwt` callback when the token predates the stamp (`Awaitable<JWT | null>` is the supported invalidation path). Today a user who changes their password because they believe it is compromised does not evict the attacker's cookie for up to 30 days.
-- **Check `email_verified` before Google account linking.** `allowDangerousEmailAccountLinking: true` is justified in `auth.config.ts` on the grounds that Google verifies every address it returns, but Auth.js never reads that claim — it links on an email match alone. Add a `signIn` callback in `auth.ts` returning `profile?.email_verified === true` for the Google provider.
-- **Keep the sign-in password out of the dev terminal.** Next logs Server Function arguments by default in development, and `signInAction` takes `{ email, password }`. Either set `logging: { serverFunctions: false }` in `next.config.ts`, or finish the migration the reset and change-password routes already made and move sign-in to a route handler.
-- **Raise the bcrypt cost factor from 10 to 12** across all five write paths that hash: `app/api/auth/register/route.ts:24`, `app/api/auth/reset-password/route.ts:19`, `app/api/account/change-password/route.ts:20`, `prisma/seed.ts:17`, `prisma/create-account.ts:27`. Optionally re-hash on successful sign-in so existing accounts migrate rather than staying at 10 forever.
-- **Correct the `verificationToken` comment in `prisma/schema.prisma`.** It claims both fields are nulled when the link is consumed; `/api/auth/verify-email` deliberately leaves them and relies on `emailVerified` to make a spent token inert. Not exploitable today — the fix is making the documented invariant match the real one so a future reader does not build on a promise the code never kept.
+<!-- Bullet points of what success looks like. Populated by /feature load. -->
 
 ## Notes
 
-**Source:** `docs/audit-results/AUTH_SECURITY_REVIEW.md` — 4 Medium, 3 Low, no Critical or High. Every item below was traced to the code and confirmed; none are speculative.
-
-**Explicitly out of scope.** The audit's first Medium finding — no rate limiting on any auth endpoint — is deferred to the next feature. That is the single highest-impact item in the report, so it should follow immediately after this one rather than drifting.
-
-**Sequencing tension worth knowing about.** Raising the bcrypt cost makes every credentials sign-in attempt more expensive server-side, which is a mitigation against offline cracking but an amplifier for the unthrottled-request problem this feature is leaving open. The audit recommends landing the limiter first or alongside. Two reasonable calls: hold the bcrypt bump until the rate-limiting feature lands, or take it now and accept a slightly larger CPU-exhaustion window in the interim. Decide at `/feature start`.
-
-**What not to touch.** The audit's Passed Checks section lists a lot of deliberate, well-reasoned design — reset tokens single-use inside a transaction, null expiry failing closed, the 72-byte bcrypt cap measured in bytes, `authorize` disclosing no failure reason, the register route's documented 409 enumeration tradeoff. None of that is in scope; several of those behaviours look like bugs at a glance and are not.
-
-**Testing.** `app/lib/email/*` and `app/lib/auth.schema.ts` already have co-located Vitest suites, and `app/api/account/*` has route tests with a mocked Prisma. The session-invalidation change is the one with real branching logic (token older than stamp, no stamp, fresh sign-in) and should get coverage; the timing fix is better verified by reading than by asserting on wall-clock.
+<!-- Additional context, constraints, or details from the spec. -->
 
 ## History
 
@@ -455,3 +440,29 @@ On the summary, "Zapisz i pobierz PDF" could do nothing at all: no label change,
 **Verified** `tsc --noEmit`, `eslint`, `prettier --check .`, `vitest run` (462 tests, 25 files) and `next build` all green. The jsdom suite covers: a blocked navigation naming the section and staying put; Dalej refusing the same way; an edit re-validated on the way back by the step indicator, with both the banner and "Znakowana matka musi mieć kolor" asserted visible; a corrected step passing without a second click; a full seven-step walk reaching the summary unobstructed; a valid submit showing "Generowanie…" while the request is out and going quiet after; and the request-failure message still appearing on a 502.
 
 **Left open:** **No browser verification.** Everything above is the automated suite; the fix was not exercised on a production build against a phone, and the voice route in particular — the one that produced the reported failure — has no test at all, since `SpeechRecognition` does not exist in jsdom. **The spoken walk can now be blocked mid-conversation**: if a section's answers do not validate, the screen stays on it (with the banner naming it) while the dialogue carries on to the next section's questions. The answers still land in the form, but screen and voice are out of step until the beekeeper fixes the field. Whether that is better than the old silent laundering is a field question. **Editing a section and returning now costs the re-validation** — a real behaviour change beekeepers will notice, and the intended one. **Form state is still not persisted**, so a reload still costs the whole inspection; that remains the fix that would make this class of bug annoying rather than catastrophic. Everything the previous entries left open still stands, minus the `context/fixes/` tracking, which this one closes.
+
+### Auth Security Review Fixes — completed 2026-09-02
+
+Six of the seven findings from `docs/audit-results/AUTH_SECURITY_REVIEW.md`, audited the same day. Rate limiting — the seventh, and the one the report ranked highest-impact — was deliberately deferred to its own feature. Merged to `main` as `7b4318a` (`70e76f4`).
+
+**Delivered**
+
+- **Timing-based user enumeration closed.** `/api/auth/forgot-password` and `resendVerificationForEmailAction` both returned a deliberately uniform body but `await`ed the Resend round trip inside their `if (user)` branch, putting "this address exists" back on the wire as several hundred milliseconds of latency. Both now schedule the send with `after()` from `next/server`, so known and unknown addresses leave in the same time. The cost is that a failed send can no longer be reported on the resend path, so its `FAILED` return is unreachable and the result is unconditional.
+- **Sessions are revoked when a password is written.** New `User.passwordChangedAt`, stamped by `/api/account/change-password` and `/api/auth/reset-password`; a new `pwdAt` claim records when a token was issued; the `jwt` callback returns `null` for any token older than the stamp. Migration `20260902122751_add_password_changed_at`.
+- **Google linking checks `email_verified`.** A `signIn` callback in `auth.ts` returns `profile?.email_verified === true` for the Google provider.
+- **`logging.serverFunctions: false`** in `next.config.ts`.
+- **bcrypt cost 10 → 12**, consolidated into `app/lib/password.ts` (`BCRYPT_ROUNDS`, `hashPassword`, `needsRehash`, `isSessionRevoked`) and read by all five write paths. `authorize` re-hashes on a successful sign-in so existing accounts migrate.
+- **Schema comment corrected** — `verificationToken` is not nulled on consumption, and now says so.
+
+**Decisions worth remembering**
+
+- **Changing your password signs you out, and that is not a bug.** A JWT carries nothing that distinguishes the session making the request from any other, so "revoke everything older than this change" necessarily includes the browser doing the changing. `ChangePasswordForm` therefore signs out deliberately and lands on `/sign-in?reset=1`, reusing the reset flow's notice; the old success banner is gone because there is no page left to show it on. Keeping the current session alive would need `SessionProvider` and a client-side `update()`, which this app does not have — it reads sessions server-side everywhere.
+- **The re-hash path must never stamp `passwordChangedAt`.** Re-hashing is not a password change. Stamping it there would sign a user out of every other device on an ordinary sign-in, for a reason they could not possibly infer. There is a comment on it in `auth.ts` because it looks like an omission.
+- **A null `passwordChangedAt` revokes nothing.** Every account predating the column has one, and reading null as "changed at the epoch" would sign the entire user base out on deploy. A token with no `pwdAt` counts as issued at 0, so it only starts failing once a real change happens — which is the wanted behaviour, not a leniency.
+- **The revocation query is in `auth.ts` only.** `proxy.ts` builds its instance from `auth.config.ts`, which has no `jwt` callback, so the Proxy hop stays cookie-only and database-free exactly as documented there. A revoked user still passes Proxy's optimistic check and is turned away by the layout's `auth()` — one indexed lookup per `auth()` call is the price.
+- **`isSessionRevoked` was extracted rather than left inline** for the reason `profile.ts` extracts its derivations: a function nested in a config object cannot be unit-tested, and its branches (no stamp, unstamped token, same-millisecond) are the ones worth pinning.
+- **The audit's Passed Checks section is a "do not touch" list.** Several deliberate behaviours read as bugs at a glance — the un-cleared verification token, the register route's 409 enumeration tradeoff, `authorize` disclosing no failure reason. None were changed.
+
+**Verified** `tsc --noEmit`, `eslint`, `prettier --check`, `vitest run` (476 tests, 26 files — up from 462) and `next build` all green. New coverage: `app/lib/password.test.ts` for the cost floor, hashing, re-hash detection and every revocation branch; a `passwordChangedAt` stamping assertion on the change-password route. The test that pinned cost 10 now asserts against `BCRYPT_ROUNDS` instead of a literal, so it tracks the constant rather than needing to be remembered alongside it.
+
+**Left open:** **Rate limiting is still absent** on every auth endpoint — credentials sign-in, register, forgot-password, resend, reset — and raising the bcrypt cost has made each unthrottled sign-in attempt roughly four times more expensive to serve. That is the next feature, spec already drafted at `context/features/rate-limiting-spec.md` (Upstash Redis), and it should not slip. **No browser verification** — everything above is the automated suite plus a production build; the sign-out-on-password-change flow in particular has not been walked by hand, and it is the one with a real UX change. **The migration is applied to the Neon development branch only**; production needs `db:deploy`. **The Google `email_verified` check has not been exercised against a real Google account** — it typechecks and the logic is trivial, but no one has signed in through it since the callback landed. **Existing sessions were not invalidated by this deploy**, by design; every cost-10 hash also stays cost-10 until its owner next signs in.
