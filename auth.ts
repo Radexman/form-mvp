@@ -4,6 +4,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { signInSchema } from '@/app/lib/auth.schema';
+import { hashPassword, isSessionRevoked, needsRehash } from '@/app/lib/password';
 import { prisma } from '@/app/lib/prisma';
 
 import authConfig, { googleProvider } from './auth.config';
@@ -68,6 +69,26 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 					return null;
 				}
 
+				/**
+				 * A successful sign-in is the only moment the plaintext is
+				 * legitimately in hand, so it is the only place a hash written at an
+				 * older cost can be upgraded — see `needsRehash`. Without this the
+				 * raised `BCRYPT_ROUNDS` would only ever apply to passwords set from
+				 * now on, and every existing account would keep its weaker hash
+				 * until its owner happened to change their password.
+				 *
+				 * Deliberately does *not* touch `passwordChangedAt`. Re-hashing is
+				 * not a password change: stamping it here would revoke every other
+				 * session the user has, on an ordinary sign-in, for no reason they
+				 * could possibly understand.
+				 */
+				if (needsRehash(user.passwordHash)) {
+					await prisma.user.update({
+						where: { id: user.id },
+						data: { passwordHash: await hashPassword(password) },
+					});
+				}
+
 				// Whatever this resolves to is handed straight to the `jwt` callback
 				// as `user`, so it lists fields explicitly — spreading the row would
 				// put `passwordHash` in the token.
@@ -114,13 +135,66 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 		...authConfig.callbacks,
 
 		/**
+		 * `allowDangerousEmailAccountLinking` on the Google provider adopts an
+		 * existing user on an email match *alone*. Auth.js does not look at
+		 * `email_verified` on that path — the flag only stops it throwing
+		 * `OAuthAccountNotLinked` — so the premise stated where it is enabled
+		 * ("Google verifies every email it returns") is an assumption the library
+		 * never checks on our behalf. This is the check that makes it true.
+		 *
+		 * Without it, a Google profile carrying someone else's address with
+		 * `email_verified: false` is handed that person's account and a live
+		 * session, and the `linkAccount` event above then stamps the address
+		 * verified and drops the real owner's pending token.
+		 */
+		signIn({ account, profile }) {
+			if (account?.provider === 'google') {
+				return profile?.email_verified === true;
+			}
+
+			// Credentials has already proven itself in `authorize`.
+			return true;
+		},
+
+		/**
 		 * `token.sub` already holds the user id, but only on the sign-in pass does
 		 * `user` exist. Copying it to a named claim keeps the `session` callback
 		 * from depending on `sub`'s implicit meaning.
+		 *
+		 * Every later pass re-checks that the password has not been written since
+		 * this token was issued. That check is the only revocation the app has:
+		 * sessions are JWTs, so a cookie outlives anything done to the row it
+		 * names, and without it someone who changes their password *because they
+		 * believe it is known* does not evict whoever knows it.
+		 *
+		 * `proxy.ts` builds its instance from `auth.config.ts`, which has no `jwt`
+		 * callback, so this query never runs on the Proxy hop — that stays cookie
+		 * only and optimistic, exactly as documented there. The cost is one
+		 * indexed lookup per `auth()` call on a page or route handler.
 		 */
-		jwt({ token, user }) {
+		async jwt({ token, user }) {
+			// The sign-in pass, and the only one where `user` exists. Nothing to
+			// revoke against: this is the moment the token becomes current.
 			if (user?.id) {
 				token.id = user.id;
+				token.pwdAt = Date.now();
+
+				return token;
+			}
+
+			if (!token.id) {
+				return token;
+			}
+
+			const row = await prisma.user.findUnique({
+				where: { id: token.id },
+				select: { passwordChangedAt: true },
+			});
+
+			if (isSessionRevoked(token.pwdAt, row?.passwordChangedAt ?? null)) {
+				// Auth.js's own signal for a spent token — the callback is typed
+				// `Awaitable<JWT | null>`, and the session then reads as signed out.
+				return null;
 			}
 
 			return token;

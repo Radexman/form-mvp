@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { BCRYPT_ROUNDS } from '@/app/lib/password';
+
 /**
  * The change-password endpoint's guard sequence.
  *
@@ -149,18 +151,38 @@ describe('POST /api/account/change-password — success', () => {
 		expect(await bcrypt.compare(CURRENT, stored)).toBe(false);
 	});
 
-	// Cost 10 everywhere — the seed, the register route and the reset route all
-	// agree, and drift would be invisible because any cost still verifies.
-	it('hashes at cost 10', async () => {
+	/**
+	 * Asserted against `BCRYPT_ROUNDS` rather than a literal. The number used to
+	 * be copied into four files with comments asking the next person to keep them
+	 * in sync; now there is one, and this test tracks it instead of pinning a
+	 * value that would have to be remembered separately.
+	 */
+	it('hashes at the shared cost factor', async () => {
 		await change();
 
-		expect(writtenHash()).toMatch(/^\$2[aby]\$10\$/);
+		expect(writtenHash()).toMatch(new RegExp(`^\\$2[aby]\\$${String(BCRYPT_ROUNDS).padStart(2, '0')}\\$`));
 	});
 
 	it('updates the signed-in user and nobody else', async () => {
 		await change();
 
 		expect(mocks.prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'user-1' } }));
+	});
+
+	/**
+	 * The stamp the `jwt` callback reads to refuse tokens older than it. Without
+	 * it the endpoint changes the password and leaves whoever the change was
+	 * meant to evict holding a working session.
+	 */
+	it('stamps passwordChangedAt so older sessions stop working', async () => {
+		const before = Date.now();
+
+		await change();
+
+		const data = mocks.prisma.user.update.mock.calls[0][0].data;
+
+		expect(data.passwordChangedAt).toBeInstanceOf(Date);
+		expect(data.passwordChangedAt.getTime()).toBeGreaterThanOrEqual(before);
 	});
 
 	/**

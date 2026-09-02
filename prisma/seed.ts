@@ -1,7 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
-import bcrypt from 'bcryptjs';
 import { config } from 'dotenv';
 
+import { hashPassword } from '../app/lib/password';
 import { HiveType, PlanTier, PrismaClient } from '../generated/prisma/client';
 
 // `prisma db seed` inherits env from the CLI, but running `tsx prisma/seed.ts`
@@ -14,7 +14,6 @@ const DEMO_NAME = 'Jan Pszczelarz';
 // is the one people try to change the password on, and a seeded password the
 // app would refuse to set is a trap.
 const DEMO_PASSWORD = 'Demo2026Miodowy';
-const SALT_ROUNDS = 10;
 
 const APIARY_NAME = 'Pasieka Turawa';
 const APIARY_LOCATION = 'Turawa, woj. opolskie';
@@ -69,7 +68,7 @@ async function main() {
 	}
 
 	console.log('[seed] Hashing password...');
-	const passwordHash = await bcrypt.hash(DEMO_PASSWORD, SALT_ROUNDS);
+	const passwordHash = await hashPassword(DEMO_PASSWORD);
 	const periodStart = currentPeriodStart(new Date());
 
 	console.log('[seed] Starting transaction...');

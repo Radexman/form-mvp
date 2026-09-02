@@ -56,3 +56,18 @@ export async function signOutAction() {
 	// bounce straight back to sign-in.
 	await signOut({ redirectTo: '/' });
 }
+
+/**
+ * Sign-out after a successful password change, which is a different event from
+ * pressing "sign out".
+ *
+ * The session this browser holds was minted before the new password, so the
+ * `jwt` callback in `auth.ts` refuses it from here on — the user is signed out
+ * whether or not anyone asks. Doing it deliberately, and landing on the same
+ * `?reset=1` notice the reset flow uses, turns that into a page explaining they
+ * need to sign in with the new password instead of an unexplained bounce out of
+ * `/profile` on their next click.
+ */
+export async function signOutAfterPasswordChangeAction() {
+	await signOut({ redirectTo: '/sign-in?reset=1' });
+}

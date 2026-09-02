@@ -1,9 +1,9 @@
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { registerSchema } from '@/app/lib/auth.schema';
 import { isEmailVerificationEnabled } from '@/app/lib/email/config';
 import { issueVerificationEmail } from '@/app/lib/email/issue-verification';
+import { hashPassword } from '@/app/lib/password';
 import { prisma } from '@/app/lib/prisma';
 import { Prisma } from '@/generated/prisma/client';
 
@@ -18,10 +18,6 @@ import { Prisma } from '@/generated/prisma/client';
  * specified to follow; issuing a session from a plain route handler would mean
  * minting a JWT outside Auth.js's own callbacks.
  */
-
-// Matches `prisma/seed.ts`, so the seeded demo password and a freshly
-// registered one are hashed identically.
-const BCRYPT_ROUNDS = 10;
 
 export async function POST(request: Request) {
 	let payload: unknown;
@@ -72,7 +68,7 @@ export async function POST(request: Request) {
 		return Response.json({ error: 'Konto z tym adresem e-mail już istnieje' }, { status: 409 });
 	}
 
-	const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+	const passwordHash = await hashPassword(password);
 	const verificationRequired = isEmailVerificationEnabled();
 
 	try {

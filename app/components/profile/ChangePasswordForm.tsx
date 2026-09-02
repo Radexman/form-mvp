@@ -2,9 +2,9 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useState } from 'react';
 
 import { AuthFormError, PasswordField } from '@/app/components/auth/fields';
+import { signOutAfterPasswordChangeAction } from '@/app/lib/auth-actions';
 import { changePasswordSchema, MIN_PASSWORD_LENGTH, type ChangePasswordValues } from '@/app/lib/auth.schema';
 
 interface ChangePasswordErrorBody {
@@ -20,12 +20,9 @@ const FIELDS = ['currentPassword', 'password', 'confirmPassword'] as const;
  * check.
  */
 export function ChangePasswordForm() {
-	const [saved, setSaved] = useState(false);
-
 	const {
 		register,
 		handleSubmit,
-		reset,
 		setError,
 		formState: { errors, isSubmitting },
 	} = useForm<ChangePasswordValues>({
@@ -34,8 +31,6 @@ export function ChangePasswordForm() {
 	});
 
 	async function onSubmit(values: ChangePasswordValues) {
-		setSaved(false);
-
 		let response: Response;
 
 		try {
@@ -50,10 +45,16 @@ export function ChangePasswordForm() {
 		}
 
 		if (response.ok) {
-			// Clearing the fields is the point: three filled password boxes left
-			// standing after a save read as "not saved yet".
-			reset();
-			setSaved(true);
+			/**
+			 * No success banner, because there is no page left to show it on. The
+			 * write stamps `passwordChangedAt`, which the `jwt` callback reads as
+			 * "every token older than this is spent" — including the one in this
+			 * browser. Signing out deliberately lands on `/sign-in?reset=1`, which
+			 * says the password was changed and asks for the new one; leaving it to
+			 * the next request instead would bounce the user out of `/profile` with
+			 * no explanation at all.
+			 */
+			await signOutAfterPasswordChangeAction();
 			return;
 		}
 
@@ -82,15 +83,6 @@ export function ChangePasswordForm() {
 			className='flex flex-col gap-4'
 		>
 			<AuthFormError message={errors.root?.message} />
-
-			{saved && (
-				<p
-					role='status'
-					className='rounded-md border border-accent/40 bg-accent/10 px-3 py-2.5 text-[13px] text-accent'
-				>
-					Hasło zostało zmienione.
-				</p>
-			)}
 
 			<PasswordField
 				label='Aktualne hasło'

@@ -23,8 +23,20 @@ model User {
   // that register with an email and password.
   passwordHash String?
 
+  // When `passwordHash` was last written, and the only thing standing between a
+  // changed password and a session someone else is still holding. Sessions are
+  // JWTs, so no row is consulted when a cookie is presented; the `jwt` callback
+  // in `auth.ts` compares this against the token's issue time and refuses any
+  // token minted before it. Null means "never changed since this column landed"
+  // and revokes nothing, which is the right answer for accounts that predate it.
+  passwordChangedAt DateTime?
+
   // One live token per user, so a re-send overwrites the previous link rather
-  // than leaving both working. Both are nulled the moment the link is consumed.
+  // than leaving both working. The token is NOT cleared on consumption — see
+  // `app/api/auth/verify-email/route.ts`, which deliberately leaves it so that
+  // the second click on a link (mail scanners fetch these before the user does)
+  // is distinguishable from a forged one. `emailVerified` is what makes a spent
+  // token inert: that route answers "already verified" before the token is read.
   verificationToken          String?   @unique
   verificationTokenExpiresAt DateTime?
 

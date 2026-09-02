@@ -1,8 +1,8 @@
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { resetPasswordRequestSchema } from '@/app/lib/auth.schema';
 import { emailFromPasswordResetIdentifier, isPasswordResetTokenExpired } from '@/app/lib/email/password-reset-token';
+import { hashPassword } from '@/app/lib/password';
 import { prisma } from '@/app/lib/prisma';
 
 /**
@@ -13,10 +13,6 @@ import { prisma } from '@/app/lib/prisma';
  * the dev console — a password submitted through an action is printed in
  * plaintext, which is exactly the bug `signInAction` still has.
  */
-
-// Matches `prisma/seed.ts` and the register route. A reset that hashed at a
-// different cost would still verify, but the drift would be invisible.
-const BCRYPT_ROUNDS = 10;
 
 const INVALID_TOKEN = 'Link jest nieprawidłowy lub wygasł. Poproś o nowy.';
 
@@ -67,13 +63,24 @@ export async function POST(request: Request) {
 		return Response.json({ error: INVALID_TOKEN }, { status: 400 });
 	}
 
-	const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+	const passwordHash = await hashPassword(password);
 
 	await prisma.$transaction([
 		prisma.user.update({
 			where: { id: user.id },
 			data: {
 				passwordHash,
+				/**
+				 * Kills every session issued before this moment — see the `jwt`
+				 * callback in `auth.ts`. Someone resetting a password they believe is
+				 * known must not leave the person who knows it signed in, and the
+				 * cookie is otherwise untouchable: sessions are JWTs.
+				 *
+				 * That includes any session the person doing the reset is holding,
+				 * which is why `/reset-password` sits outside the `(anonymous)` group
+				 * and the form sends them to `/sign-in?reset=1` afterwards.
+				 */
+				passwordChangedAt: new Date(),
 				/**
 				 * Opening the link proves control of the mailbox, which is the same
 				 * thing the verification link proves. Without this an unverified user

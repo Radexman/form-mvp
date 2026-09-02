@@ -1,8 +1,8 @@
 import { PrismaPg } from '@prisma/adapter-pg';
-import bcrypt from 'bcryptjs';
 import { config } from 'dotenv';
 
 import { registerSchema } from '../app/lib/auth.schema';
+import { hashPassword } from '../app/lib/password';
 import { PlanTier, PrismaClient } from '../generated/prisma/client';
 
 /**
@@ -23,8 +23,6 @@ import { PlanTier, PrismaClient } from '../generated/prisma/client';
  */
 
 config({ path: ['.env.local', '.env'], quiet: true });
-
-const SALT_ROUNDS = 10;
 
 /**
  * Deliberately NOT `DATABASE_URL`. That variable points at the development
@@ -87,7 +85,7 @@ async function main() {
 		return;
 	}
 
-	const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+	const passwordHash = await hashPassword(password);
 	const periodStart = currentPeriodStart(new Date());
 
 	await prisma.$transaction(

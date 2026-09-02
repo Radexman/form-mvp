@@ -1,5 +1,7 @@
 'use server';
 
+import { after } from 'next/server';
+
 import { auth } from '@/auth';
 import { prisma } from '@/app/lib/prisma';
 
@@ -66,6 +68,9 @@ export async function resendVerificationAction(): Promise<ResendResult> {
  * address comes from the query string — but it only ever mails an account that
  * exists and is still unverified, and answers identically either way so the
  * page cannot be used to test which addresses are registered.
+ *
+ * Identical in *timing* as well as in wording: the send is scheduled, not
+ * awaited. See the comment on it below.
  */
 export async function resendVerificationForEmailAction(email: string): Promise<ResendResult> {
 	if (!isEmailVerificationEnabled()) {
@@ -80,12 +85,25 @@ export async function resendVerificationForEmailAction(email: string): Promise<R
 	});
 
 	if (user && !user.emailVerified && user.passwordHash) {
-		try {
-			await issueVerificationEmail(user.id, user.email);
-		} catch (error) {
-			console.error('[check-email] resend failed', error);
-			return { ok: false, message: FAILED };
-		}
+		/**
+		 * Scheduled rather than awaited, for the reason `/api/auth/forgot-password`
+		 * schedules its send: an identical message is only half the answer if one
+		 * branch takes a Resend round trip longer than the other. The oracle here
+		 * would be the sharper of the two — a slow reply means the address exists
+		 * *and* is unverified *and* has a password.
+		 *
+		 * The cost is that a failed send can no longer be reported, so `FAILED` is
+		 * unreachable on this path and the result below is unconditional. That is
+		 * the same trade the forgot-password route already makes: the token is
+		 * stored before the send, so pressing the button again mints a fresh one.
+		 */
+		after(async () => {
+			try {
+				await issueVerificationEmail(user.id, user.email);
+			} catch (error) {
+				console.error('[check-email] resend failed', error);
+			}
+		});
 	}
 
 	return { ok: true, message: SENT };
