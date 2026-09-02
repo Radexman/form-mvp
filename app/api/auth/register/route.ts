@@ -5,6 +5,8 @@ import { isEmailVerificationEnabled } from '@/app/lib/email/config';
 import { issueVerificationEmail } from '@/app/lib/email/issue-verification';
 import { hashPassword } from '@/app/lib/password';
 import { prisma } from '@/app/lib/prisma';
+import { registerLimiter } from '@/app/lib/ratelimit';
+import { checkRateLimit, formatRetryAfter, getIp, rateLimitedResponse } from '@/app/lib/ratelimit-helpers';
 import { Prisma } from '@/generated/prisma/client';
 
 /**
@@ -20,6 +22,21 @@ import { Prisma } from '@/generated/prisma/client';
  */
 
 export async function POST(request: Request) {
+	/**
+	 * First, ahead of the body parse. This route answers 409 on a taken address —
+	 * a leak it accepts as the price of a usable signup — and that trade only
+	 * holds while nobody can walk the endpoint in bulk. It also creates rows and
+	 * sends mail, so the limiter caps both enumeration and mass registration.
+	 */
+	const { limited, retryAfterSeconds } = await checkRateLimit(registerLimiter, await getIp());
+
+	if (limited) {
+		return rateLimitedResponse(
+			`Zbyt wiele prób rejestracji. Spróbuj ponownie za ${formatRetryAfter(retryAfterSeconds)}.`,
+			retryAfterSeconds,
+		);
+	}
+
 	let payload: unknown;
 
 	try {

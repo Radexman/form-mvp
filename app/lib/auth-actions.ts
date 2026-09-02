@@ -6,6 +6,8 @@ import { signIn, signOut } from '@/auth';
 
 import { safeCallbackUrl } from './callback-url';
 import { signInSchema } from './auth.schema';
+import { loginLimiter } from './ratelimit';
+import { checkRateLimit, formatRetryAfter, getIp } from './ratelimit-helpers';
 
 /**
  * Auth.js entry points for the UI. Server actions because `auth.ts` pulls in
@@ -20,6 +22,18 @@ export async function signInAction(
 	values: { email: string; password: string },
 	callbackUrl?: string,
 ): Promise<SignInActionResult | undefined> {
+	/**
+	 * Before the schema parse and well before `signIn`, because `authorize`
+	 * bcrypt-compares on every attempt: an unthrottled sign-in is both a
+	 * credential-stuffing target and the cheapest way to pin our CPU. A malformed
+	 * submission still costs a token — sending garbage must not buy free tries.
+	 */
+	const { limited, retryAfterSeconds } = await checkRateLimit(loginLimiter, await getIp());
+
+	if (limited) {
+		return { error: `Zbyt wiele prób logowania. Spróbuj ponownie za ${formatRetryAfter(retryAfterSeconds)}.` };
+	}
+
 	const parsed = signInSchema.safeParse(values);
 
 	if (!parsed.success) {

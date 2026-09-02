@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { forgotPasswordSchema } from '@/app/lib/auth.schema';
 import { issuePasswordResetEmail } from '@/app/lib/email/issue-password-reset';
 import { prisma } from '@/app/lib/prisma';
+import { passwordResetLimiter } from '@/app/lib/ratelimit';
+import { checkRateLimit, formatRetryAfter, getIp, rateLimitedResponse } from '@/app/lib/ratelimit-helpers';
 
 /**
  * Requests a password reset link. Answers `200 { ok: true }` for every address
@@ -18,6 +20,23 @@ import { prisma } from '@/app/lib/prisma';
  * is scheduled rather than awaited — see below.
  */
 export async function POST(request: Request) {
+	/**
+	 * Keyed by IP, which is what keeps it compatible with the uniform answer
+	 * above: the limiter can only ever reveal that *this caller* has asked too
+	 * often, never whether the address they asked about exists. It runs on every
+	 * request, so the added Redis round trip is identical on both branches and
+	 * the timing equivalence the route depends on survives.
+	 *
+	 * Without it the endpoint mails an address of the caller's choosing on demand
+	 * — a free spam relay pointed at anyone, and a fast way to burn the Resend
+	 * domain reputation the real verification mail depends on.
+	 */
+	const { limited, retryAfterSeconds } = await checkRateLimit(passwordResetLimiter, await getIp());
+
+	if (limited) {
+		return rateLimitedResponse(`Spróbuj ponownie za ${formatRetryAfter(retryAfterSeconds)}.`, retryAfterSeconds);
+	}
+
 	let payload: unknown;
 
 	try {

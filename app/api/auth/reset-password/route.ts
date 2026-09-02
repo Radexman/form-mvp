@@ -4,6 +4,8 @@ import { resetPasswordRequestSchema } from '@/app/lib/auth.schema';
 import { emailFromPasswordResetIdentifier, isPasswordResetTokenExpired } from '@/app/lib/email/password-reset-token';
 import { hashPassword } from '@/app/lib/password';
 import { prisma } from '@/app/lib/prisma';
+import { passwordResetSubmitLimiter } from '@/app/lib/ratelimit';
+import { checkRateLimit, formatRetryAfter, getIp, rateLimitedResponse } from '@/app/lib/ratelimit-helpers';
 
 /**
  * Consumes a reset link and sets the new password.
@@ -17,6 +19,14 @@ import { prisma } from '@/app/lib/prisma';
 const INVALID_TOKEN = 'Link jest nieprawidłowy lub wygasł. Poproś o nowy.';
 
 export async function POST(request: Request) {
+	// Caps unauthenticated lookups against the token table. Its own generous
+	// bucket, not the one that limits asking for links — see ratelimit.ts.
+	const { limited, retryAfterSeconds } = await checkRateLimit(passwordResetSubmitLimiter, await getIp());
+
+	if (limited) {
+		return rateLimitedResponse(`Spróbuj ponownie za ${formatRetryAfter(retryAfterSeconds)}.`, retryAfterSeconds);
+	}
+
 	let payload: unknown;
 
 	try {

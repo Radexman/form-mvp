@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { auth } from '@/auth';
 import { formatShortName } from '@/app/lib/dashboard';
 
@@ -89,13 +91,14 @@ export function Topbar({ apiaryName, location }: TopbarProps) {
 						<PlusIcon className={ICON} />
 						<span className='hidden lg:inline'>Dodaj ul</span>
 					</button>
-					<button
-						type='button'
+					{/* The only way into the wizard now that `/` no longer renders it. */}
+					<Link
+						href='/inspection'
 						className={`${BUTTON_PRIMARY} ${BUTTON_BASE} px-3`}
 					>
 						<PlusIcon className={ICON} />
 						Nowy przegląd
-					</button>
+					</Link>
 				</>
 			}
 		/>
